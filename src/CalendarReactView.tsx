@@ -442,6 +442,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       longPressTimer = null;
     };
     const showMenu = (evt: MouseEvent) => {
+      if ((evt.target as HTMLElement).closest(".fc-event-resizer")) return;
       evt.preventDefault();
       if (Platform.isPhone) evt.stopImmediatePropagation();
       clearTimer();
