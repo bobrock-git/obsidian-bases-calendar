@@ -11,6 +11,7 @@ import {
 import React, { StrictMode } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { CalendarHandle, CalendarReactView } from "./CalendarReactView";
+import { CalendarViewState, readViewState } from "./view-state";
 import { AppContext } from "./context";
 import { resolveColor } from "./colors";
 
@@ -40,6 +41,7 @@ export class CalendarView extends BasesView {
   private weekStartDay: number = 1;
   private scrollToTime: string = "08:00:00";
   private currentView: string = "workWeek";
+  private currentDate: string | undefined;
   private slotDuration: string = "00:30:00";
 
   constructor(controller: QueryController, scrollEl: HTMLElement) {
@@ -76,15 +78,17 @@ export class CalendarView extends BasesView {
   }
 
   public setEphemeralState(state: unknown): void {
-    if (state && typeof state === "object") {
-      const s = state as Record<string, unknown>;
-      if (typeof s.currentView === "string") this.currentView = s.currentView;
-      if (typeof s.slotDuration === "string") this.slotDuration = s.slotDuration;
-    }
+    const s = readViewState(state);
+    if (s.currentView) this.currentView = s.currentView;
+    if (s.slotDuration) this.slotDuration = s.slotDuration;
+    if (s.date) this.currentDate = s.date;
+    // Obsidian restores history before the first render, so initialDate does
+    // the work; a calendar that is already on screen is moved explicitly.
+    this.calendarHandleRef.current?.restore(this.currentView, this.currentDate);
   }
 
-  public getEphemeralState(): unknown {
-    return { currentView: this.currentView, slotDuration: this.slotDuration };
+  public getEphemeralState(): CalendarViewState {
+    return { currentView: this.currentView, slotDuration: this.slotDuration, date: this.currentDate };
   }
 
   private loadConfig(): void {
@@ -162,11 +166,13 @@ export class CalendarView extends BasesView {
             entries={this.entries}
             weekStartDay={this.weekStartDay}
             initialView={this.currentView}
+            initialDate={this.currentDate}
             initialSlotDuration={this.slotDuration}
             scrollToTime={this.scrollToTime}
             detailProperty={this.detailProp}
             properties={this.config.getOrder() || []}
             onViewChange={(view) => { this.currentView = view; }}
+            onDateChange={(date) => { this.currentDate = date; }}
             onZoomChange={(dur) => { this.slotDuration = dur; }}
             onEntryClick={(entry, isModEvent) => {
               void this.app.workspace.openLinkText(
