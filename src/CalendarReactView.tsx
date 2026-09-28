@@ -538,6 +538,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       nowIndicator={true}
       scrollTime={scrollToTime}
       slotDuration={slotDuration}
+      slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+      eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
       slotEventOverlap={false}
       eventMinHeight={Platform.isPhone && activeView === "threeDay" ? 44 : 20}
       navLinks={false}
