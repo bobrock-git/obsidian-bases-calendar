@@ -497,7 +497,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   }, []);
 
   return (
-    <div className="bases-calendar-react-shell">
+    <div className={`bases-calendar-react-shell${Platform.isPhone && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
       {Platform.isPhone && editable && activeView === "threeDay" && (
         <button
           type="button"
@@ -541,7 +541,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       scrollTime={scrollToTime}
       slotDuration={slotDuration}
       slotEventOverlap={false}
-      eventMinHeight={20}
+      eventMinHeight={Platform.isPhone && activeView === "threeDay" ? 44 : 20}
       navLinks={false}
       events={events}
       eventContent={renderEventContent}
