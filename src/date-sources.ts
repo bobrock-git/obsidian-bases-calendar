@@ -12,6 +12,16 @@ export interface DateSource {
   statusNot?: string;
   allowTime: boolean;
   color?: string;
+  icon?: string;
+  markOverdue: boolean;
+}
+
+// Lucide names from the Base config; Obsidian's setIcon also accepts the
+// "lucide-" prefix, which is dropped so both spellings give one icon.
+export function roleIconName(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const name = raw.trim().replace(/^lucide-/, "");
+  return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(name) ? name : undefined;
 }
 
 const noteProperty = (value: unknown): value is BasesPropertyId =>
@@ -49,6 +59,8 @@ export function parseDateSources(raw: unknown): DateSource[] {
         (source.statusNot != null && typeof source.statusNot !== "string") ||
         (source.color != null && typeof source.color !== "string") ||
         (source.allowTime != null && typeof source.allowTime !== "boolean") ||
+        (source.icon != null && !roleIconName(source.icon)) ||
+        (source.markOverdue != null && typeof source.markOverdue !== "boolean") ||
         (source.endDate != null && source.durationProperty != null)) {
       throw new Error(`dateSources[${index}] has invalid properties`);
     }
@@ -64,6 +76,8 @@ export function parseDateSources(raw: unknown): DateSource[] {
       statusNot: source.statusNot,
       allowTime: source.allowTime === true,
       color: source.color,
+      icon: roleIconName(source.icon),
+      markOverdue: source.markOverdue === true,
     } as DateSource;
   });
 }

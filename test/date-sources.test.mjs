@@ -34,3 +34,18 @@ test("invalid and duplicate source roles fail loudly", () => {
   assert.throws(() => parseDateSources([{ ...source, startDate: "formula.date" }]), /invalid properties/);
   assert.throws(() => parseDateSources("not json"), /JSON array/);
 });
+
+test("a role carries its icon and overdue marking", () => {
+  const [plain] = parseDateSources([source]);
+  assert.equal(plain.icon, undefined);
+  assert.equal(plain.markOverdue, false);
+  const [followup] = parseDateSources([{ ...source, icon: "lucide-bell-ring", markOverdue: true }]);
+  assert.equal(followup.icon, "bell-ring");
+  assert.equal(followup.markOverdue, true);
+});
+
+test("a malformed icon or overdue flag fails loudly", () => {
+  assert.throws(() => parseDateSources([{ ...source, icon: "Bell Ring" }]), /invalid properties/);
+  assert.throws(() => parseDateSources([{ ...source, icon: "" }]), /invalid properties/);
+  assert.throws(() => parseDateSources([{ ...source, markOverdue: "yes" }]), /invalid properties/);
+});

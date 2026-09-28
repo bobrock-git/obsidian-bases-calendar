@@ -828,3 +828,75 @@ body.is-phone .bases-calendar-container {
 .bases-calendar-event-role {
 	font-weight: 600;
 }
+
+/* CRM block look (#413). The stripe and tint say whose date it is (the entity
+   colour of the note type), the role icon says what the date is, and the ring
+   says the date has passed. Box shadows, not borders: the base rule hides
+   borders with !important, and a shadow leaves the block size unchanged. */
+.bases-calendar-container {
+	--bases-calendar-stripe-width: 3px;
+	--bases-calendar-ring-width: 2px;
+	--bases-calendar-overdue: var(--hermes-followup-zalegly, var(--text-error));
+}
+
+.bases-calendar-container .fc-event.bases-calendar-accented {
+	background-color: color-mix(in srgb, var(--bases-calendar-accent) 16%, var(--background-primary));
+	box-shadow: inset var(--bases-calendar-stripe-width) 0 0 var(--bases-calendar-accent);
+}
+
+.bases-calendar-container .fc-event.is-overdue {
+	box-shadow: inset 0 0 0 var(--bases-calendar-ring-width) var(--bases-calendar-overdue);
+}
+
+.bases-calendar-container .fc-event.bases-calendar-accented.is-overdue {
+	box-shadow:
+		inset var(--bases-calendar-stripe-width) 0 0 var(--bases-calendar-accent),
+		inset 0 0 0 var(--bases-calendar-ring-width) var(--bases-calendar-overdue);
+}
+
+/* Mixed with the text colour: a bare yellow glyph on a yellow tint is too
+   faint, and the mix lightens in dark mode on its own. */
+.bases-calendar-event-role-icon {
+	display: inline-flex;
+	margin-inline-end: var(--size-2-2);
+	color: color-mix(in srgb, var(--bases-calendar-accent, var(--text-muted)) 70%, var(--text-normal));
+	vertical-align: -0.2em;
+}
+
+.bases-calendar-event-role-icon svg,
+.bases-calendar-source-icon svg {
+	width: 1.15em;
+	height: 1.15em;
+}
+
+/* The title list is capped at 100% of the title; beside the icon it would
+   overflow and collapse to a bare ellipsis, so it gives the icon its room. */
+.bases-calendar-event-role-icon + .bases-calendar-prop-list {
+	max-width: calc(100% - 1.15em - var(--size-2-2));
+}
+
+.bases-calendar-source-icon {
+	margin-inline-end: var(--size-2-2);
+}
+
+/* A timed block is as tall as its duration, so in a short one the title sat
+   at the top with twice the space below it. Short blocks centre their content;
+   tall ones stay top-aligned like every calendar. The query measures the block
+   itself, so the rule follows zoom levels as well. */
+.bases-calendar-container .fc-timegrid-event .fc-event-main {
+	container-type: size;
+}
+
+@container (max-height: 44px) {
+	.bases-calendar-container .fc-timegrid-event .bases-calendar-event-content {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		height: 100%;
+		padding-block: 0;
+	}
+
+	.bases-calendar-container .fc-timegrid-event .bases-calendar-event-title:last-child {
+		margin-bottom: 0;
+	}
+}
