@@ -703,6 +703,74 @@ body.is-phone .bases-calendar-container {
 	color: var(--text-muted);
 }
 
+/* Phone toolbar (React, not FullCalendar): ‹ Dziś › | range ▾ | move, filter.
+   Flat controls with a small radius; the phone --button-radius is a pill. */
+.bases-calendar-phone-toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	padding: var(--size-2-2) var(--size-4-1);
+}
+
+.bases-calendar-phone-group {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+.bases-calendar-phone-toolbar button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--size-2-1);
+	min-width: 40px;
+	min-height: 40px;
+	padding: 0 var(--size-2-3);
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	touch-action: manipulation;
+}
+
+.bases-calendar-phone-toolbar button:focus {
+	box-shadow: none;
+}
+
+.bases-calendar-phone-toolbar button:focus-visible {
+	box-shadow: 0 0 0 var(--input-border-width-focus) var(--background-modifier-border-focus);
+}
+
+.bases-calendar-phone-toolbar .bases-calendar-range-button {
+	flex: 1 1 auto;
+	min-width: 0;
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+}
+
+.bases-calendar-icon {
+	display: inline-flex;
+}
+
+.bases-calendar-range-chevron {
+	flex-shrink: 0;
+	color: var(--text-muted);
+	--icon-size: var(--icon-xs);
+}
+
+/* Move mode on: accent icon on a soft tile – a touch now drags, not opens. */
+.bases-calendar-phone-toolbar .bases-calendar-move-toggle.is-active {
+	background-color: var(--background-modifier-active-hover);
+	color: var(--text-accent);
+}
+
+.bases-calendar-phone-toolbar .bases-calendar-filter-button.is-filtered {
+	color: var(--text-accent);
+}
+
 /* Hidden anchor for the native date picker behind "Go to date". */
 .bases-calendar-date-jump {
 	position: fixed;

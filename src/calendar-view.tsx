@@ -21,6 +21,7 @@ import { AppContext } from "./context";
 import { resolveColor } from "./colors";
 import { locale, t } from "./i18n";
 import { DateSource, matchesDateSource, parseDateSources, sourceEventId } from "./date-sources";
+import { isPhoneLayout } from "./platform";
 
 export const CalendarViewType = "calendar";
 
@@ -324,7 +325,7 @@ export class CalendarView extends BasesView {
 
   private showEntryContextMenu(evt: MouseEvent, calendarEntry: CalendarEntry): void {
     const file = calendarEntry.entry.file;
-    if (Platform.isPhone) {
+    if (isPhoneLayout()) {
       // A shared context menu also receives actions for links rendered inside the
       // event. A private menu keeps this menu about the event's own note.
       const menu = new Menu();

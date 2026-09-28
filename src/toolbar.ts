@@ -10,21 +10,15 @@ export interface ToolbarLayout {
 }
 
 /**
- * Desktop keeps the full two-sided toolbar. A phone gets a single row:
- * navigation on the left, the title in the middle and two icon menus on the
- * right (view + zoom, source filter), so the time grid gets the height back.
+ * Desktop FullCalendar toolbar. The phone toolbar is rendered by React
+ * (navigation, range selector, move toggle, filter) with headerToolbar off.
  */
-export function toolbarLayout(isPhone: boolean, hasSources: boolean, canMove = false): ToolbarLayout {
-  if (!isPhone) {
-    return {
-      left: "title",
-      center: "",
-      right: `${CALENDAR_VIEWS.join(",")} prev,today,next zoomOut,zoomIn`,
-    };
-  }
-  // The date range itself is the view selector ("28 wrz – 2 paź ▾").
-  const right = [canMove ? "moveMode" : "", hasSources ? "sourceMenu" : ""].filter(Boolean).join(",");
-  return { left: "prev,today,next", center: "rangeMenu", right };
+export function toolbarLayout(): ToolbarLayout {
+  return {
+    left: "title",
+    center: "",
+    right: `${CALENDAR_VIEWS.join(",")} prev,today,next zoomOut,zoomIn`,
+  };
 }
 
 /**

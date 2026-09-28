@@ -3,22 +3,10 @@ import { test } from "node:test";
 import { moveToggle, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "../src/toolbar.ts";
 
 test("desktop keeps the full toolbar with every view button", () => {
-  const layout = toolbarLayout(false, true);
+  const layout = toolbarLayout();
   assert.equal(layout.left, "title");
   assert.match(layout.right, /dayGridMonth,timeGridWeek,workWeek,threeDay,timeGridDay/);
   assert.match(layout.right, /zoomOut,zoomIn/);
-  assert.doesNotMatch(layout.right, /Menu/);
-});
-
-test("phone fits one row: navigation, range selector, icon toggles", () => {
-  assert.deepEqual(toolbarLayout(true, true, true),
-    { left: "prev,today,next", center: "rangeMenu", right: "moveMode,sourceMenu" });
-});
-
-test("phone drops the icons it cannot use", () => {
-  assert.equal(toolbarLayout(true, false, true).right, "moveMode");
-  assert.equal(toolbarLayout(true, true, false).right, "sourceMenu");
-  assert.equal(toolbarLayout(true, false, false).right, "");
 });
 
 test("phone title format hints at the view", () => {

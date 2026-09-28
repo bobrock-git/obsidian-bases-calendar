@@ -16,9 +16,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
+import { isPhoneLayout } from "./platform";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
 import { CALENDAR_VIEWS, moveToggle, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
+
+const LucideIcon = ({ name, className }: { name: string; className?: string }) => {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (ref.current) setIcon(ref.current, name);
+  }, [name]);
+  return <span ref={ref} className={`bases-calendar-icon${className ? ` ${className}` : ""}`} aria-hidden="true" />;
+};
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
@@ -84,8 +93,6 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   moveModeRef.current = moveMode;
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
-  // Set when the move toggle switched to 3 days; viewDidMount then keeps moving on.
-  const pendingMoveRef = useRef(false);
   const [rangeTitle, setRangeTitle] = useState("");
   const lastLongPressRef = useRef<{ id: string; at: number } | null>(null);
   const [hiddenSources, setHiddenSources] = useState<string[]>([]);
@@ -214,50 +221,36 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     }
   };
 
+  // Phone: the date range is the view selector ("28 wrz – 2 paź ▾").
+  const openRangeMenu = (el: HTMLElement) => {
+    const api = calendarRef.current?.getApi();
+    if (!api) return;
+    const menu = new Menu();
+    for (const view of CALENDAR_VIEWS) {
+      menu.addItem((item) => item.setTitle(viewLabel(view))
+        .setChecked(api.view.type === view)
+        .onClick(() => api.changeView(view)));
+    }
+    menu.addSeparator();
+    menu.addItem((item) => item.setTitle(t("goToDate")).setIcon("calendar-search")
+      .onClick(() => pickDate(el, (date) => api.gotoDate(date))));
+    menu.addSeparator();
+    menu.addItem((item) => item.setTitle(t("zoomIn")).setIcon("zoom-in").onClick(() => handleZoom("in")));
+    menu.addItem((item) => item.setTitle(t("zoomOut")).setIcon("zoom-out").onClick(() => handleZoom("out")));
+    showAtButton(menu, el);
+  };
+
+  // Phone: "move events" toggle; outside 3 days it switches there first.
+  const toggleMove = () => {
+    const next = moveToggle(activeViewRef.current, moveModeRef.current);
+    if (next.changeView) calendarRef.current?.getApi().changeView(next.changeView);
+    setMoveMode(next.moveMode);
+  };
+
   const customButtons = useMemo(
     () => ({
       zoomIn:  { text: "+", hint: t("zoomIn"),  click: () => handleZoom("in") },
       zoomOut: { text: "−", hint: t("zoomOut"), click: () => handleZoom("out") },
-      // Phone only: the date range is the view selector ("28 wrz – 2 paź ▾").
-      rangeMenu: {
-        text: "", hint: t("viewMenu"),
-        click: (_evt: MouseEvent, el: HTMLElement) => {
-          const api = calendarRef.current?.getApi();
-          if (!api) return;
-          const menu = new Menu();
-          for (const view of CALENDAR_VIEWS) {
-            menu.addItem((item) => item.setTitle(viewLabel(view))
-              .setChecked(api.view.type === view)
-              .onClick(() => api.changeView(view)));
-          }
-          menu.addSeparator();
-          menu.addItem((item) => item.setTitle(t("goToDate")).setIcon("calendar-search")
-            .onClick(() => pickDate(el, (date) => api.gotoDate(date))));
-          menu.addSeparator();
-          menu.addItem((item) => item.setTitle(t("zoomIn")).setIcon("zoom-in").onClick(() => handleZoom("in")));
-          menu.addItem((item) => item.setTitle(t("zoomOut")).setIcon("zoom-out").onClick(() => handleZoom("out")));
-          showAtButton(menu, el);
-        },
-      },
-      // Phone only: "move events" toggle; outside 3 days it switches there first.
-      moveMode: {
-        text: "", hint: t("move"),
-        click: () => {
-          const next = moveToggle(activeViewRef.current, moveModeRef.current);
-          if (next.changeView) {
-            pendingMoveRef.current = true;
-            calendarRef.current?.getApi().changeView(next.changeView);
-          } else {
-            setMoveMode(next.moveMode);
-          }
-        },
-      },
-      // Phone only: source filter chips collapse into a checklist popover that
-      // stays open, so several roles can be toggled in one go.
-      sourceMenu: {
-        text: "", hint: t("filterEvents"),
-        click: (_evt: MouseEvent, el: HTMLElement) => toggleSourcePopover(el),
-      },
     }),
     [handleZoom],
   );
@@ -280,42 +273,13 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     .map((item) => [item.source!.id, item.source!.label])).entries());
   sourceLabelsRef.current = sourceLabels;
   hiddenSourcesRef.current = hiddenSources;
-  const toolbar = toolbarLayout(Platform.isPhone, sourceLabels.length > 1, editable);
+  const toolbar = toolbarLayout();
 
-  // FullCalendar renders custom buttons as plain text; give the phone menus
-  // Obsidian icons and keep the filter badge in sync with the hidden roles.
-  useEffect(() => {
-    const shell = shellRef.current;
-    if (!shell) return;
-    const rangeButton = shell.querySelector<HTMLElement>(".fc-rangeMenu-button");
-    if (rangeButton && (rangeButton.dataset.title !== rangeTitle || !rangeButton.querySelector(".bases-calendar-range-label"))) {
-      rangeButton.empty();
-      rangeButton.createSpan({ cls: "bases-calendar-range-label", text: rangeTitle });
-      setIcon(rangeButton.createSpan({ cls: "bases-calendar-range-chevron" }), "chevron-down");
-      rangeButton.dataset.title = rangeTitle;
-      rangeButton.setAttribute("aria-label", `${t("viewMenu")}: ${rangeTitle}`);
-    }
-    const moveButton = shell.querySelector<HTMLElement>(".fc-moveMode-button");
-    if (moveButton) {
-      if (!moveButton.querySelector("svg")) setIcon(moveButton, "move");
-      moveButton.setAttribute("aria-pressed", String(moveMode));
-      moveButton.setAttribute("aria-label", moveMode ? t("stopMove") : t("move"));
-      moveButton.setAttribute("title", moveMode ? t("stopMove") : t("move"));
-    }
-    const sourceButton = shell.querySelector<HTMLElement>(".fc-sourceMenu-button");
-    if (sourceButton) {
-      if (!sourceButton.querySelector("svg")) setIcon(sourceButton, "filter");
-      let badge = sourceButton.querySelector<HTMLElement>(".bases-calendar-source-badge");
-      const text = sourceBadge(sourceLabels.length, hiddenSources.length);
-      if (!badge) {
-        badge = document.createElement("span");
-        badge.className = "bases-calendar-source-badge";
-        sourceButton.appendChild(badge);
-      }
-      badge.textContent = text;
-      sourceButton.toggleClass("is-filtered", text !== "");
-    }
-  });
+  const phone = isPhoneLayout();
+
+  const badge = sourceBadge(sourceLabels.length, hiddenSources.length);
+  const api = () => calendarRef.current?.getApi();
+
   const events = entries.filter((item) => !item.source || !hiddenSources.includes(item.source.id)).map((calEntry) => {
     // FullCalendar treats allDay end dates as exclusive; add one day to make inclusive.
     let adjustedEndDate = calEntry.endDate;
@@ -633,8 +597,9 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   const handleViewDidMount = useCallback(
     (arg: ViewMountArg) => {
       setActiveView(arg.view.type);
-      setMoveMode(pendingMoveRef.current && arg.view.type === "threeDay");
-      pendingMoveRef.current = false;
+      // Moving only exists in 3 days; leaving it switches the mode off. The
+      // callback can fire more than once per switch, so it never turns it on.
+      if (arg.view.type !== "threeDay") setMoveMode(false);
       onViewChange(arg.view.type);
     },
     [onViewChange],
@@ -654,12 +619,12 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     const showMenu = (evt: MouseEvent) => {
       if ((evt.target as HTMLElement).closest(".fc-event-resizer")) return;
       evt.preventDefault();
-      if (Platform.isPhone) evt.stopImmediatePropagation();
+      if (isPhoneLayout()) evt.stopImmediatePropagation();
       clearTimer();
-      if (Platform.isPhone && moveModeRef.current) return;
+      if (isPhoneLayout() && moveModeRef.current) return;
       const previous = lastLongPressRef.current;
       if (previous?.id === info.event.id && Date.now() - previous.at < 1000 && evt.isTrusted) return;
-      if (Platform.isPhone) {
+      if (isPhoneLayout()) {
         lastLongPressRef.current = { id: info.event.id, at: Date.now() };
       }
       const syntheticEvent = {
@@ -672,7 +637,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       onEntryContextMenu(syntheticEvent, info.event.extendedProps.calendarEntry as CalendarEntry);
     };
     const onPointerDown = (evt: PointerEvent) => {
-      if (!Platform.isPhone || moveModeRef.current || evt.pointerType !== "touch") return;
+      if (!isPhoneLayout() || moveModeRef.current || evt.pointerType !== "touch") return;
       if ((evt.target as HTMLElement).closest(".fc-event-resizer")) return;
       clearTimer();
       startX = evt.clientX;
@@ -716,8 +681,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   }, []);
 
   return (
-    <div ref={shellRef} className={`bases-calendar-react-shell${Platform.isPhone && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
-      {!Platform.isPhone && sourceLabels.length > 1 && (
+    <div ref={shellRef} className={`bases-calendar-react-shell${isPhoneLayout() && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
+      {!isPhoneLayout() && sourceLabels.length > 1 && (
         <div className="bases-calendar-source-filters" role="group" aria-label={t("filterEvents")}>
           {sourceLabels.map(([id, label]) => (
             <button key={id} type="button" aria-pressed={!hiddenSources.includes(id)}
@@ -726,6 +691,44 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
               {label}
             </button>
           ))}
+        </div>
+      )}
+      {phone && (
+        // Phone toolbar is plain React, not FullCalendar custom buttons:
+        // FullCalendar re-renders its buttons and resets aria-pressed and any
+        // icon injected into them, so the move toggle never showed its state.
+        <div className="bases-calendar-phone-toolbar">
+          <div className="bases-calendar-phone-group">
+            <button type="button" className="clickable-icon" aria-label={t("previous")} onClick={() => api()?.prev()}>
+              <LucideIcon name="chevron-left" />
+            </button>
+            <button type="button" className="bases-calendar-today" onClick={() => api()?.today()}>{t("today")}</button>
+            <button type="button" className="clickable-icon" aria-label={t("next")} onClick={() => api()?.next()}>
+              <LucideIcon name="chevron-right" />
+            </button>
+          </div>
+          <button type="button" className="bases-calendar-range-button" aria-haspopup="menu"
+            aria-label={`${t("viewMenu")}: ${rangeTitle}`} onClick={(evt) => openRangeMenu(evt.currentTarget)}>
+            <span className="bases-calendar-range-label">{rangeTitle}</span>
+            <LucideIcon name="chevron-down" className="bases-calendar-range-chevron" />
+          </button>
+          <div className="bases-calendar-phone-group">
+            {editable && (
+              <button type="button" className={`clickable-icon bases-calendar-move-toggle${moveMode ? " is-active" : ""}`}
+                aria-pressed={moveMode} aria-label={moveMode ? t("stopMove") : t("move")}
+                title={moveMode ? t("stopMove") : t("move")} onClick={toggleMove}>
+                <LucideIcon name="move" />
+              </button>
+            )}
+            {sourceLabels.length > 1 && (
+              <button type="button" className={`clickable-icon bases-calendar-filter-button${badge ? " is-filtered" : ""}`}
+                aria-haspopup="dialog" aria-label={t("filterEvents")}
+                onClick={(evt) => toggleSourcePopover(evt.currentTarget)}>
+                <LucideIcon name="filter" />
+                {badge && <span className="bases-calendar-source-badge">{badge}</span>}
+              </button>
+            )}
+          </div>
         </div>
       )}
     <FullCalendar
@@ -752,8 +755,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         timeGridDay: { buttonText: t("dayView") },
       }}
       firstDay={weekStartDay}
-      headerToolbar={toolbar}
-      titleFormat={Platform.isPhone ? phoneTitleFormat(activeView) : undefined}
+      headerToolbar={phone ? false : toolbar}
+      titleFormat={isPhoneLayout() ? phoneTitleFormat(activeView) : undefined}
       customButtons={customButtons}
       buttonText={{ today: t("today") }}
       nowIndicator={true}
@@ -762,14 +765,14 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
       eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
       slotEventOverlap={false}
-      eventMinHeight={Platform.isPhone && activeView === "threeDay" ? 44 : 20}
+      eventMinHeight={isPhoneLayout() && activeView === "threeDay" ? 44 : 20}
       navLinks={false}
       events={events}
       eventContent={renderEventContent}
-      eventClassNames={Platform.isPhone && moveMode ? ["bases-calendar-phone-moving"] : []}
+      eventClassNames={isPhoneLayout() && moveMode ? ["bases-calendar-phone-moving"] : []}
       // FullCalendar makes touch users hold an event for 1 s before it drags.
       // In move mode the toggle already states the intent, so drag at once.
-      eventLongPressDelay={Platform.isPhone && moveMode ? 0 : 1000}
+      eventLongPressDelay={isPhoneLayout() && moveMode ? 0 : 1000}
       eventDidMount={handleEventDidMount}
       eventWillUnmount={handleEventWillUnmount}
       eventClick={handleEventClick}
@@ -786,11 +789,11 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       fixedWeekCount={false}
       fixedMirrorParent={document.body ?? undefined}
       eventDurationEditable={
-        (resizeEditable && (!Platform.isPhone || (activeView === "threeDay" && moveMode))) ||
+        (resizeEditable && (!isPhoneLayout() || (activeView === "threeDay" && moveMode))) ||
         (endDateEditable && activeView === "dayGridMonth")
       }
-      eventStartEditable={editable && (!Platform.isPhone || (activeView === "threeDay" && moveMode))}
-      editable={editable && (!Platform.isPhone || (activeView === "threeDay" && moveMode))}
+      eventStartEditable={editable && (!isPhoneLayout() || (activeView === "threeDay" && moveMode))}
+      editable={editable && (!isPhoneLayout() || (activeView === "threeDay" && moveMode))}
     />
     </div>
   );
