@@ -19,6 +19,7 @@ import { createRoot, Root } from "react-dom/client";
 import { CalendarHandle, CalendarReactView } from "./CalendarReactView";
 import { AppContext } from "./context";
 import { resolveColor } from "./colors";
+import { locale, t } from "./i18n";
 
 export const CalendarViewType = "calendar";
 
@@ -121,7 +122,7 @@ export class CalendarView extends BasesView {
       this.root = null;
       this.containerEl.empty();
       this.containerEl.createDiv("bases-calendar-empty").textContent =
-        "Configure a start date property to display entries";
+        t("empty");
       return;
     }
 
@@ -267,7 +268,7 @@ export class CalendarView extends BasesView {
         menu.addItem((item) =>
           item
             .setSection("reschedule")
-            .setTitle("Zmień termin")
+            .setTitle(t("reschedule"))
             .setIcon("calendar-clock")
             .onClick(() => {
               new RescheduleModal(this.app, calendarEntry, (start, end, allDay) =>
@@ -280,14 +281,14 @@ export class CalendarView extends BasesView {
       menu.addItem((item) =>
         item
           .setSection("navigation")
-          .setTitle("Otwórz notatkę")
+          .setTitle(t("openNote"))
           .setIcon("file-text")
           .onClick(() => void this.app.workspace.openLinkText(file.path, "", false)),
       );
       menu.addItem((item) =>
         item
           .setSection("navigation")
-          .setTitle("Otwórz w nowej karcie")
+          .setTitle(t("openTab"))
           .setIcon("file-plus")
           .onClick(() => void this.app.workspace.openLinkText(file.path, "", true)),
       );
@@ -301,7 +302,7 @@ export class CalendarView extends BasesView {
       menu.addItem((item) =>
         item
           .setSection("action")
-          .setTitle("Zmień termin")
+          .setTitle(t("reschedule"))
           .setIcon("calendar-clock")
           .onClick(() => {
             new RescheduleModal(this.app, calendarEntry, (start, end, allDay) =>
@@ -313,7 +314,7 @@ export class CalendarView extends BasesView {
     menu.addItem((item) =>
       item
         .setSection("danger")
-        .setTitle("Delete file")
+        .setTitle(t("deleteFile"))
         .setIcon("lucide-trash-2")
         .setWarning(true)
         .onClick(() => this.app.fileManager.promptForDeletion(file)),
@@ -383,78 +384,78 @@ export class CalendarView extends BasesView {
   static getViewOptions(): BasesAllOptions[] {
     return [
       {
-        displayName: "Date properties",
+        displayName: t("dateProperties"),
         type: "group",
         items: [
           {
-            displayName: "Start date",
+            displayName: t("startDate"),
             type: "property",
             key: "startDate",
-            placeholder: "Property",
+            placeholder: t("property"),
           },
           {
-            displayName: "End date (optional)",
+            displayName: t("endDate"),
             type: "property",
             key: "endDate",
-            placeholder: "Property",
+            placeholder: t("property"),
           },
           {
-            displayName: "Duration in minutes (optional)",
+            displayName: t("duration"),
             type: "property",
             key: "durationProperty",
-            placeholder: "Property",
+            placeholder: t("property"),
           },
         ],
       },
       {
-        displayName: "Event display",
+        displayName: t("eventDisplay"),
         type: "group",
         items: [
           {
-            displayName: "Detail property",
+            displayName: t("detailProperty"),
             type: "property",
             key: "detailProperty",
-            placeholder: "Property shown on 2nd line (e.g. people)",
+            placeholder: t("detailHint"),
           },
           {
-            displayName: "Color property",
+            displayName: t("colorProperty"),
             type: "property",
             key: "colorProperty",
-            placeholder: "Property (e.g. tomato, sage, peacock…)",
+            placeholder: t("colorHint"),
           },
         ],
       },
       {
-        displayName: "Calendar options",
+        displayName: t("calendarOptions"),
         type: "group",
         items: [
           {
-            displayName: "Week starts on",
+            displayName: t("weekStarts"),
             type: "dropdown",
             key: "weekStartDay",
             default: "monday",
             options: {
-              sunday: "Sunday",
-              monday: "Monday",
-              tuesday: "Tuesday",
-              wednesday: "Wednesday",
-              thursday: "Thursday",
-              friday: "Friday",
-              saturday: "Saturday",
+              sunday: t("sunday"),
+              monday: t("monday"),
+              tuesday: t("tuesday"),
+              wednesday: t("wednesday"),
+              thursday: t("thursday"),
+              friday: t("friday"),
+              saturday: t("saturday"),
             },
           },
           {
-            displayName: "Day starts at",
+            displayName: t("dayStarts"),
             type: "dropdown",
             key: "scrollToTime",
             default: "08:00:00",
             options: {
-              "00:00:00": "Midnight",
-              "06:00:00": "6:00 AM",
-              "07:00:00": "7:00 AM",
-              "08:00:00": "8:00 AM",
-              "09:00:00": "9:00 AM",
-              "10:00:00": "10:00 AM",
+              "00:00:00": t("midnight"),
+              "06:00:00": "06:00",
+              "07:00:00": "07:00",
+              "08:00:00": "08:00",
+              "09:00:00": "09:00",
+              "10:00:00": "10:00",
             },
           },
         ],
@@ -499,16 +500,16 @@ class RescheduleModal extends Modal {
     heading.createSpan({ text: title });
     const entityType = this.app.metadataCache.getFileCache(file)?.frontmatter?.type;
     if (typeof entityType === "string") void this.applyVaultEntityIcon(heading, entityType);
-    contentEl.createEl("p", { text: "Zmień termin", cls: "bases-calendar-reschedule-subtitle" });
+    contentEl.createEl("p", { text: t("reschedule"), cls: "bases-calendar-reschedule-subtitle" });
 
     let dateInput!: HTMLInputElement;
     let timeInput: HTMLInputElement;
     let selectedAllDay = allDay;
-    new Setting(contentEl).setName("Data").addText((text) => {
+    new Setting(contentEl).setName(t("date")).addText((text) => {
       dateInput = text.inputEl;
       dateInput.type = "date";
       dateInput.value = formatDate(startDate);
-      dateInput.setAttribute("aria-label", "Nowa data");
+      dateInput.setAttribute("aria-label", t("newDate"));
     });
     const weekendNotice = contentEl.createDiv({
       cls: "bases-calendar-weekend-notice",
@@ -516,7 +517,7 @@ class RescheduleModal extends Modal {
     });
     const shortcuts = contentEl.createDiv({
       cls: "bases-calendar-date-shortcuts",
-      attr: { role: "group", "aria-label": "Szybki wybór daty" },
+      attr: { role: "group", "aria-label": t("quickDates") },
     });
     const shortcutButtons: { day: string; button: HTMLButtonElement }[] = [];
     const syncDateState = () => {
@@ -531,26 +532,26 @@ class RescheduleModal extends Modal {
       dateInput.toggleClass("is-weekend", isWeekend);
       weekendNotice.hidden = !isWeekend;
       weekendNotice.setText(isWeekend
-        ? `${weekday === 6 ? "Sobota" : "Niedziela"} — termin wypada w weekend`
+        ? `${weekday === 6 ? t("saturday") : t("sunday")} — ${t("weekend")}`
         : "");
     };
     for (const [label, days] of [
-      ["Jutro", 1],
-      ["Pojutrze", 2],
-      ["Za tydzień", 7],
+      [t("tomorrow"), 1],
+      [t("dayAfterTomorrow"), 2],
+      [t("nextWeek"), 7],
     ] as const) {
       const target = new Date();
       target.setDate(target.getDate() + days);
       const day = formatDate(target);
       const weekday = target.getDay();
       const isWeekend = weekday === 0 || weekday === 6;
-      const dateLabel = target.toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit" });
-      const weekdayLabel = weekday === 6 ? "sob." : "niedz.";
+      const dateLabel = target.toLocaleDateString(locale(), { day: "2-digit", month: "2-digit" });
+      const weekdayLabel = weekday === 6 ? t("saturdayShort") : t("sundayShort");
       const button = shortcuts.createEl("button", {
         cls: "bases-calendar-date-shortcut",
         attr: {
           type: "button",
-          "aria-label": `${label}, ${target.toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
+          "aria-label": `${label}, ${target.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
           "aria-pressed": "false",
         },
       });
@@ -571,32 +572,32 @@ class RescheduleModal extends Modal {
     dateInput.addEventListener("input", syncDateState);
     dateInput.addEventListener("change", syncDateState);
     syncDateState();
-    new Setting(contentEl).setName("Cały dzień").addToggle((toggle) => {
+    new Setting(contentEl).setName(t("allDay")).addToggle((toggle) => {
       toggle.setValue(allDay).onChange((value) => {
         selectedAllDay = value;
         timeInput.disabled = value;
       });
     });
-    new Setting(contentEl).setName("Godzina").addText((text) => {
+    new Setting(contentEl).setName(t("time")).addText((text) => {
       timeInput = text.inputEl;
       timeInput.type = "time";
       timeInput.value = allDay ? "09:00" : formatTime(startDate);
       timeInput.disabled = allDay;
-      timeInput.setAttribute("aria-label", "Nowa godzina");
+      timeInput.setAttribute("aria-label", t("newTime"));
     });
 
     new Setting(contentEl).setClass("bases-calendar-reschedule-actions")
       .addButton((button) =>
-        button.setButtonText("Anuluj").onClick(() => this.close()),
+        button.setButtonText(t("cancel")).onClick(() => this.close()),
       )
       .addButton((button) =>
         button
-          .setButtonText("Zapisz")
+          .setButtonText(t("save"))
           .setCta()
           .onClick(async () => {
             const nextStart = parseLocalDate(dateInput.value, timeInput.value, selectedAllDay);
             if (!nextStart) {
-              new Notice("Wybierz poprawną datę i godzinę");
+              new Notice(t("invalidDate"));
               return;
             }
             const nextEnd = shiftEndDate(startDate, endDate, nextStart, allDay);
@@ -604,10 +605,10 @@ class RescheduleModal extends Modal {
             try {
               await this.onSave(nextStart, nextEnd, selectedAllDay);
               this.close();
-              new Notice("Termin zmieniony");
+              new Notice(t("saved"));
             } catch (error) {
               console.error("Could not reschedule calendar entry:", error);
-              new Notice("Nie udało się zmienić terminu");
+              new Notice(t("saveFailed"));
               button.setDisabled(false);
             }
           }),

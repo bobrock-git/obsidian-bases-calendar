@@ -9,12 +9,14 @@ import type {
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin, { type EventResizeDoneArg } from "@fullcalendar/interaction";
 import FullCalendar from "@fullcalendar/react";
+import plLocale from "@fullcalendar/core/locales/pl";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { BasesEntry, BasesPropertyId, DateValue, Platform, Value } from "obsidian";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
+import { language, locale, t } from "./i18n";
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
@@ -93,8 +95,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
 
   const customButtons = useMemo(
     () => ({
-      zoomIn:  { text: "+", hint: "Zoom in",  click: () => handleZoom("in") },
-      zoomOut: { text: "−", hint: "Zoom out", click: () => handleZoom("out") },
+      zoomIn:  { text: "+", hint: t("zoomIn"),  click: () => handleZoom("in") },
+      zoomOut: { text: "−", hint: t("zoomOut"), click: () => handleZoom("out") },
     }),
     [handleZoom],
   );
@@ -286,7 +288,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
                 ? { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
                 : { year: "numeric", month: "short", day: "numeric" };
             node.appendChild(
-              document.createTextNode(value.date.toLocaleDateString(undefined, opts)),
+              document.createTextNode(value.date.toLocaleDateString(locale(), opts)),
             );
           }
           return;
@@ -503,12 +505,14 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
           aria-pressed={moveMode}
           onClick={() => setMoveMode((current) => !current)}
         >
-          {moveMode ? "Zakończ przesuwanie" : "Przesuwaj spotkania"}
+          {moveMode ? t("stopMove") : t("move")}
         </button>
       )}
     <FullCalendar
       ref={calendarRef}
       plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+      locales={[plLocale]}
+      locale={language()}
       initialView={initialView}
       views={{
         // Month auto-sizes to show all week rows (no inner scroll needed).
@@ -518,14 +522,14 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         workWeek: {
           type: "timeGridWeek",
           weekends: false,
-          buttonText: "Work week",
+          buttonText: t("workWeek"),
         },
         threeDay: {
           type: "timeGrid",
           duration: { days: 3 },
-          buttonText: "3 day",
+          buttonText: t("threeDay"),
         },
-        timeGridDay: { buttonText: "Today" },
+        timeGridDay: { buttonText: t("today") },
       }}
       firstDay={weekStartDay}
       headerToolbar={{
@@ -534,7 +538,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         right: "dayGridMonth,timeGridWeek,workWeek,threeDay,timeGridDay prev,today,next zoomOut,zoomIn",
       }}
       customButtons={customButtons}
-      buttonText={{ today: "Today" }}
+      buttonText={{ today: t("today") }}
       nowIndicator={true}
       scrollTime={scrollToTime}
       slotDuration={slotDuration}
