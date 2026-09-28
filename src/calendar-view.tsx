@@ -9,6 +9,7 @@ import {
   Notice,
   Platform,
   Setting,
+  TFile,
   parsePropertyId,
   QueryController,
   setIcon,
@@ -496,6 +497,8 @@ class RescheduleModal extends Modal {
       if (!icon.querySelector("svg")) icon.remove();
     }
     heading.createSpan({ text: title });
+    const entityType = this.app.metadataCache.getFileCache(file)?.frontmatter?.type;
+    if (typeof entityType === "string") void this.applyVaultEntityIcon(heading, entityType);
     contentEl.createEl("p", { text: "Zmień termin", cls: "bases-calendar-reschedule-subtitle" });
 
     let dateInput!: HTMLInputElement;
@@ -609,6 +612,31 @@ class RescheduleModal extends Modal {
             }
           }),
       );
+  }
+
+  private async applyVaultEntityIcon(heading: HTMLElement, entityType: string): Promise<void> {
+    const registryFile = this.app.vault.getAbstractFileByPath("system/registry/registry-ikony.json");
+    if (!(registryFile instanceof TFile)) return;
+    try {
+      const registry = JSON.parse(await this.app.vault.cachedRead(registryFile)) as {
+        categories?: { id?: string; items?: { id?: string; lucide_name?: string; color?: string }[] }[];
+      };
+      const entityIcons = registry.categories?.find((category) => category.id === "encje_h1_i_taby")?.items;
+      const item = entityIcons?.find((candidate) => candidate.id === `entity-${entityType.toLowerCase()}`);
+      if (!item?.lucide_name || !item.id || !/^entity-[a-z-]+$/.test(item.id) || !heading.isConnected) return;
+      let icon = heading.querySelector<HTMLElement>(".bases-calendar-reschedule-entity-icon");
+      if (!icon) {
+        icon = document.createElement("span");
+        icon.className = "bases-calendar-reschedule-entity-icon";
+        icon.setAttribute("aria-hidden", "true");
+        setIcon(icon, item.lucide_name);
+        if (!icon.querySelector("svg")) return;
+        heading.prepend(icon);
+      }
+      icon.style.color = `var(--${item.id}-color, ${item.color || "var(--text-muted)"})`;
+    } catch (error) {
+      console.warn("Could not load vault entity icon:", error);
+    }
   }
 }
 
