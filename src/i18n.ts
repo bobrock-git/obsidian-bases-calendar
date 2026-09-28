@@ -3,7 +3,7 @@ import { getLanguage } from "obsidian";
 const translations = {
   en: {
     calendar: "Calendar", empty: "Configure a start date property to display entries",
-    zoomIn: "Zoom in", zoomOut: "Zoom out", workWeek: "Work week", threeDay: "3 day", today: "Today",
+    zoomIn: "Zoom in", zoomOut: "Zoom out", workWeek: "Work week", threeDay: "3 day", dayView: "Day", today: "Today",
     move: "Move events", stopMove: "Stop moving",
     reschedule: "Reschedule", openNote: "Open note", openTab: "Open in new tab", deleteFile: "Delete file",
     dateProperties: "Date properties", startDate: "Start date", endDate: "End date (optional)",
@@ -22,7 +22,7 @@ const translations = {
   },
   pl: {
     calendar: "Kalendarz", empty: "Skonfiguruj właściwość daty początkowej, aby wyświetlić wpisy",
-    zoomIn: "Powiększ", zoomOut: "Pomniejsz", workWeek: "Tydzień roboczy", threeDay: "3 dni", today: "Dziś",
+    zoomIn: "Powiększ", zoomOut: "Pomniejsz", workWeek: "Tydzień roboczy", threeDay: "3 dni", dayView: "Dzień", today: "Dziś",
     move: "Przesuwaj spotkania", stopMove: "Zakończ przesuwanie",
     reschedule: "Zmień termin", openNote: "Otwórz notatkę", openTab: "Otwórz w nowej karcie", deleteFile: "Usuń plik",
     dateProperties: "Właściwości daty", startDate: "Data początkowa", endDate: "Data końcowa (opcjonalnie)",
