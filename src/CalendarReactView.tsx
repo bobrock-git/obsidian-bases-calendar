@@ -570,7 +570,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
           duration: { days: 3 },
           buttonText: t("threeDay"),
         },
-        timeGridDay: { buttonText: t("today") },
+        timeGridDay: { buttonText: t("dayView") },
       }}
       firstDay={weekStartDay}
       headerToolbar={{
