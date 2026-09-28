@@ -771,6 +771,42 @@ body.is-phone .bases-calendar-container {
 	color: var(--text-accent);
 }
 
+/* Phone move mode: the end resizer of a selected block becomes a visible
+   grip (FullCalendar draws an 8px dot) with a wide touch band under it.
+   The band reaches 12px into the block and 16px below it, so the middle of
+   the block still moves the whole event. */
+/* The block clips its content (overflow: hidden above); the selected block
+   must not clip the grip and its touch band, or the part below the block is
+   dead. The text stays clipped by .fc-event-main. */
+.bases-calendar-container .bases-calendar-react-shell.is-moving .fc-timegrid-event.fc-event-selected {
+	overflow: visible !important;
+}
+
+.bases-calendar-react-shell.is-moving .fc-v-event.fc-event-selected .fc-event-resizer-end {
+	left: 50%;
+	width: 32px;
+	height: 6px;
+	margin-left: -16px;
+	bottom: -3px;
+	border: 1px solid var(--text-muted);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+}
+
+.bases-calendar-react-shell.is-moving .fc-v-event.fc-event-selected .fc-event-resizer-end::before {
+	top: -12px;
+	bottom: -16px;
+	left: -60px;
+	right: -60px;
+}
+
+.bases-calendar-live-time {
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
 /* Hidden anchor for the native date picker behind "Go to date". */
 .bases-calendar-date-jump {
 	position: fixed;

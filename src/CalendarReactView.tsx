@@ -19,7 +19,7 @@ import { useApp } from "./hooks";
 import { isPhoneLayout } from "./platform";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
-import { CALENDAR_VIEWS, moveToggle, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
+import { CALENDAR_VIEWS, liveTimeLabel, moveToggle, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
 
 const LucideIcon = ({ name, className }: { name: string; className?: string }) => {
   const ref = useRef<HTMLSpanElement>(null);
@@ -575,8 +575,15 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         }
       }
 
+      // While a block is dragged or resized, its mirror shows the new span,
+      // so the finger does not have to guess what lands in duration_min.
+      const liveLabel = eventInfo.isMirror && (eventInfo.isDragging || eventInfo.isResizing) && !allDay && start
+        ? liveTimeLabel(start, end)
+        : null;
+
       return (
         <div className="bases-calendar-event-content">
+          {liveLabel && <div className="bases-calendar-live-time">{liveLabel}</div>}
           <div className="bases-calendar-event-details">
             <div className="bases-calendar-event-title">
               {calendarEntry.source && <span className="bases-calendar-event-role">{calendarEntry.source.label}: </span>}
@@ -681,7 +688,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   }, []);
 
   return (
-    <div ref={shellRef} className={`bases-calendar-react-shell${isPhoneLayout() && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
+    <div ref={shellRef} className={`bases-calendar-react-shell${isPhoneLayout() && activeView === "threeDay" ? " bases-calendar-three-day" : ""}${isPhoneLayout() && moveMode ? " is-moving" : ""}`}>
       {!isPhoneLayout() && sourceLabels.length > 1 && (
         <div className="bases-calendar-source-filters" role="group" aria-label={t("filterEvents")}>
           {sourceLabels.map(([id, label]) => (

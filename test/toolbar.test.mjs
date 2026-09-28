@@ -41,3 +41,10 @@ test("onlySource hides every role except the chosen one", async () => {
   assert.deepEqual(onlySource(["meeting", "event", "followup"], "event"), ["meeting", "followup"]);
   assert.deepEqual(onlySource(["meeting"], "meeting"), []);
 });
+
+test("live label shows the span and the minutes written to duration_min", async () => {
+  const { liveTimeLabel } = await import("../src/toolbar.ts");
+  assert.equal(liveTimeLabel(new Date(2026, 8, 29, 9, 0), new Date(2026, 8, 29, 10, 30)), "09:00–10:30 · 90 min");
+  assert.equal(liveTimeLabel(new Date(2026, 8, 29, 23, 30), new Date(2026, 8, 30, 0, 15)), "23:30–00:15 · 45 min");
+  assert.equal(liveTimeLabel(new Date(2026, 8, 29, 7, 5), null), "07:05");
+});

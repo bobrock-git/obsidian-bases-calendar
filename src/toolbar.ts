@@ -52,3 +52,11 @@ export function toggleSource(hidden: readonly string[], id: string): string[] {
 export function onlySource(allIds: readonly string[], id: string): string[] {
   return allIds.filter((item) => item !== id);
 }
+
+/** Live label on a block while it is dragged or resized: "09:00–10:30 · 90 min". */
+export function liveTimeLabel(start: Date, end: Date | null): string {
+  const hm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (!end) return hm(start);
+  const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  return `${hm(start)}–${hm(end)} · ${minutes} min`;
+}
