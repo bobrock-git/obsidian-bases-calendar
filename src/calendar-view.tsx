@@ -11,6 +11,7 @@ import {
   Setting,
   parsePropertyId,
   QueryController,
+  setIcon,
 } from "obsidian";
 import React, { StrictMode } from "react";
 import { createRoot, Root } from "react-dom/client";
@@ -417,9 +418,20 @@ class RescheduleModal extends Modal {
     const { startDate, endDate, allDay } = this.calendarEntry;
     this.modalEl.addClass("bases-calendar-reschedule-modal");
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Zmień termin" });
+    const file = this.calendarEntry.entry.file;
+    let title = file.basename;
+    const cachedTitle = this.app.metadataCache.getFileCache(file)?.frontmatter?.title;
+    if (typeof cachedTitle === "string" && cachedTitle.trim()) title = cachedTitle.trim();
+    try {
+      const value = this.calendarEntry.entry.getValue("note.title");
+      if (value?.isTruthy()) title = value.toString().trim() || title;
+    } catch {
+      // Keep the file name when this Base does not expose note.title.
+    }
+    contentEl.createEl("h2", { text: title, cls: "bases-calendar-reschedule-title" });
+    contentEl.createEl("p", { text: "Zmień termin", cls: "bases-calendar-reschedule-subtitle" });
 
-    let dateInput: HTMLInputElement;
+    let dateInput!: HTMLInputElement;
     let timeInput: HTMLInputElement;
     let selectedAllDay = allDay;
     new Setting(contentEl).setName("Data").addText((text) => {
@@ -428,9 +440,19 @@ class RescheduleModal extends Modal {
       dateInput.value = formatDate(startDate);
       dateInput.setAttribute("aria-label", "Nowa data");
     });
-    const shortcuts = contentEl.createDiv({ cls: "bases-calendar-date-shortcuts" });
+    const shortcuts = contentEl.createDiv({
+      cls: "bases-calendar-date-shortcuts",
+      attr: { role: "group", "aria-label": "Szybki wybór daty" },
+    });
+    const shortcutButtons: { day: string; button: HTMLButtonElement }[] = [];
+    const syncShortcutState = () => {
+      for (const { day, button } of shortcutButtons) {
+        const selected = dateInput.value === day;
+        button.setAttribute("aria-pressed", String(selected));
+        button.toggleClass("is-selected", selected);
+      }
+    };
     for (const [label, days] of [
-      ["Dziś", 0],
       ["Jutro", 1],
       ["Pojutrze", 2],
       ["Za tydzień", 7],
@@ -438,17 +460,34 @@ class RescheduleModal extends Modal {
       const target = new Date();
       target.setDate(target.getDate() + days);
       const day = formatDate(target);
+      const weekday = target.getDay();
+      const isWeekend = weekday === 0 || weekday === 6;
+      const dateLabel = target.toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit" });
+      const weekdayLabel = weekday === 6 ? "sob." : "niedz.";
       const button = shortcuts.createEl("button", {
         cls: "bases-calendar-date-shortcut",
-        attr: { type: "button", "aria-label": `${label}, ${day}` },
+        attr: {
+          type: "button",
+          "aria-label": `${label}, ${target.toLocaleDateString("pl-PL", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
+          "aria-pressed": "false",
+        },
       });
       button.createSpan({ text: label });
-      button.createSpan({ text: target.toLocaleDateString("pl-PL"), cls: "bases-calendar-date-shortcut-value" });
+      button.createSpan({
+        text: isWeekend ? `${weekdayLabel} ${dateLabel}` : dateLabel,
+        cls: `bases-calendar-date-shortcut-value${isWeekend ? " is-weekend" : ""}`,
+      });
+      const check = button.createSpan({ cls: "bases-calendar-date-shortcut-check" });
+      setIcon(check, "check");
       button.addEventListener("click", () => {
         dateInput.value = day;
         dateInput.dispatchEvent(new Event("change", { bubbles: true }));
       });
+      shortcutButtons.push({ day, button });
     }
+    dateInput.addEventListener("input", syncShortcutState);
+    dateInput.addEventListener("change", syncShortcutState);
+    syncShortcutState();
     new Setting(contentEl).setName("Cały dzień").addToggle((toggle) => {
       toggle.setValue(allDay).onChange((value) => {
         selectedAllDay = value;
