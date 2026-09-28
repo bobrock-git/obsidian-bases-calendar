@@ -561,6 +561,10 @@ body.is-phone .bases-calendar-reschedule-modal .bases-calendar-reschedule-action
 	color: var(--text-muted);
 }
 
+body.is-phone .bases-calendar-source-filter {
+	min-height: 44px;
+}
+
 .bases-calendar-source-filter[aria-pressed="true"] {
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
