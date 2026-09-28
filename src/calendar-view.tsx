@@ -184,7 +184,7 @@ export class CalendarView extends BasesView {
       startDate: result.date,
       endDate,
       durationMinutes,
-      allDay: !result.hasTimed,
+      allDay: source ? !source.allowTime || !result.hasTimed : !result.hasTimed,
       ...colorProps,
     };
   }
