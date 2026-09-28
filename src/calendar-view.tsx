@@ -5,6 +5,9 @@ import {
   BasesView,
   DateValue,
   Menu,
+  Modal,
+  Notice,
+  Setting,
   parsePropertyId,
   QueryController,
 } from "obsidian";
@@ -254,6 +257,20 @@ export class CalendarView extends BasesView {
     const file = entry.file;
     const menu = Menu.forEvent(evt);
     this.app.workspace.handleLinkContextMenu(menu, file.path, "");
+    const calendarEntry = this.entries.find((item) => item.entry.file.path === file.path);
+    if (this.isEditable() && calendarEntry) {
+      menu.addItem((item) =>
+        item
+          .setSection("action")
+          .setTitle("Zmień termin")
+          .setIcon("calendar-clock")
+          .onClick(() => {
+            new RescheduleModal(this.app, calendarEntry, (start, end, allDay) =>
+              this.updateEntryDates(entry, start, end, allDay),
+            ).open();
+          }),
+      );
+    }
     menu.addItem((item) =>
       item
         .setSection("danger")
@@ -289,7 +306,7 @@ export class CalendarView extends BasesView {
       extractedStartProp === null ||
       (this.endDateProp && extractedEndProp === null)
     ) {
-      return;
+      throw new Error("Date properties are not editable note properties");
     }
 
     await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
@@ -405,6 +422,120 @@ export class CalendarView extends BasesView {
       },
     ];
   }
+}
+
+class RescheduleModal extends Modal {
+  constructor(
+    app: CalendarView["app"],
+    private readonly calendarEntry: CalendarEntry,
+    private readonly onSave: (start: Date, end: Date | undefined, allDay: boolean) => Promise<void>,
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    const { startDate, endDate, allDay } = this.calendarEntry;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Zmień termin" });
+
+    let dateInput: HTMLInputElement;
+    let timeInput: HTMLInputElement;
+    let selectedAllDay = allDay;
+    new Setting(contentEl).setName("Data").addText((text) => {
+      dateInput = text.inputEl;
+      dateInput.type = "date";
+      dateInput.value = formatDate(startDate);
+      dateInput.setAttribute("aria-label", "Nowa data");
+    });
+    new Setting(contentEl).setName("Cały dzień").addToggle((toggle) => {
+      toggle.setValue(allDay).onChange((value) => {
+        selectedAllDay = value;
+        timeInput.disabled = value;
+      });
+    });
+    new Setting(contentEl).setName("Godzina").addText((text) => {
+      timeInput = text.inputEl;
+      timeInput.type = "time";
+      timeInput.value = allDay ? "09:00" : formatTime(startDate);
+      timeInput.disabled = allDay;
+      timeInput.setAttribute("aria-label", "Nowa godzina");
+    });
+
+    new Setting(contentEl)
+      .addButton((button) =>
+        button.setButtonText("Anuluj").onClick(() => this.close()),
+      )
+      .addButton((button) =>
+        button
+          .setButtonText("Zapisz")
+          .setCta()
+          .onClick(async () => {
+            const nextStart = parseLocalDate(dateInput.value, timeInput.value, selectedAllDay);
+            if (!nextStart) {
+              new Notice("Wybierz poprawną datę i godzinę");
+              return;
+            }
+            const nextEnd = shiftEndDate(startDate, endDate, nextStart, allDay);
+            button.setDisabled(true);
+            try {
+              await this.onSave(nextStart, nextEnd, selectedAllDay);
+              this.close();
+              new Notice("Termin zmieniony");
+            } catch (error) {
+              console.error("Could not reschedule calendar entry:", error);
+              new Notice("Nie udało się zmienić terminu");
+              button.setDisabled(false);
+            }
+          }),
+      );
+  }
+}
+
+function formatTime(date: Date): string {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function parseLocalDate(day: string, time: string | undefined, allDay: boolean): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) return null;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText) - 1;
+  const date = Number(dayText);
+  let hour = 0;
+  let minute = 0;
+  if (!allDay) {
+    const timeMatch = /^(\d{2}):(\d{2})$/.exec(time ?? "");
+    if (!timeMatch) return null;
+    hour = Number(timeMatch[1]);
+    minute = Number(timeMatch[2]);
+  }
+  const result = new Date(year, month, date, hour, minute);
+  if (
+    result.getFullYear() !== year ||
+    result.getMonth() !== month ||
+    result.getDate() !== date ||
+    result.getHours() !== hour ||
+    result.getMinutes() !== minute
+  ) return null;
+  return result;
+}
+
+function shiftEndDate(
+  oldStart: Date,
+  oldEnd: Date | undefined,
+  newStart: Date,
+  allDay: boolean,
+): Date | undefined {
+  if (!oldEnd) return undefined;
+  if (!allDay) return new Date(newStart.getTime() + oldEnd.getTime() - oldStart.getTime());
+  const oldStartDay = Date.UTC(oldStart.getFullYear(), oldStart.getMonth(), oldStart.getDate());
+  const oldEndDay = Date.UTC(oldEnd.getFullYear(), oldEnd.getMonth(), oldEnd.getDate());
+  const dayOffset = Math.round((oldEndDay - oldStartDay) / 86_400_000);
+  const newEnd = new Date(newStart);
+  newEnd.setDate(newEnd.getDate() + dayOffset);
+  return newEnd;
 }
 
 function formatDate(date: Date): string {
