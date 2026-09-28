@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
 import { language, locale, t } from "./i18n";
+import { inclusiveAllDayEnd } from "./all-day-end";
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
@@ -42,9 +43,10 @@ interface CalendarReactViewProps {
     newEnd?: Date,
     allDay?: boolean,
   ) => Promise<void>;
-  onEventResize?: (entry: BasesEntry, newStart: Date, newEnd: Date) => Promise<void>;
+  onEventResize?: (entry: BasesEntry, newStart: Date, newEnd: Date, allDay: boolean) => Promise<void>;
   editable: boolean;
   resizeEditable: boolean;
+  endDateEditable: boolean;
   calendarHandleRef?: React.RefObject<CalendarHandle | null>;
 }
 
@@ -64,6 +66,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   onEventResize,
   editable,
   resizeEditable,
+  endDateEditable,
   calendarHandleRef,
 }) => {
   const app = useApp();
@@ -147,6 +150,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       start: calEntry.startDate,
       end: adjustedEndDate,
       allDay: calEntry.allDay,
+      durationEditable: calEntry.allDay ? endDateEditable : resizeEditable,
       backgroundColor: calEntry.backgroundColor,
       borderColor: calEntry.borderColor,
       extendedProps: {
@@ -246,7 +250,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       const { event } = resizeInfo;
       const { start, end } = event;
       if (
-        !onEventResize || event.allDay || !start || !end ||
+        !onEventResize || (event.allDay && !endDateEditable) || !start || !end ||
         !Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
         end.getTime() <= start.getTime()
       ) {
@@ -254,12 +258,17 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         return;
       }
       try {
-        await onEventResize(event.extendedProps.entry as BasesEntry, start, end);
+        const storedEnd = event.allDay ? inclusiveAllDayEnd(start, end) : end;
+        if (!storedEnd) {
+          resizeInfo.revert();
+          return;
+        }
+        await onEventResize(event.extendedProps.entry as BasesEntry, start, storedEnd, event.allDay);
       } catch {
         resizeInfo.revert();
       }
     },
-    [onEventResize],
+    [onEventResize, endDateEditable],
   );
 
   const hasNonEmptyValue = useCallback((value: Value): boolean => {
@@ -455,6 +464,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     };
     const onPointerDown = (evt: PointerEvent) => {
       if (!Platform.isPhone || moveModeRef.current || evt.pointerType !== "touch") return;
+      if ((evt.target as HTMLElement).closest(".fc-event-resizer")) return;
       clearTimer();
       startX = evt.clientX;
       startY = evt.clientY;
@@ -562,7 +572,11 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       height="100%"
       fixedWeekCount={false}
       fixedMirrorParent={document.body ?? undefined}
-      eventDurationEditable={resizeEditable && (!Platform.isPhone || (activeView === "threeDay" && moveMode))}
+      eventDurationEditable={
+        (resizeEditable && (!Platform.isPhone || (activeView === "threeDay" && moveMode))) ||
+        (endDateEditable && activeView === "dayGridMonth")
+      }
+      eventStartEditable={editable && (!Platform.isPhone || (activeView === "threeDay" && moveMode))}
       editable={editable && (!Platform.isPhone || (activeView === "threeDay" && moveMode))}
     />
     </div>

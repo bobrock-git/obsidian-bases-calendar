@@ -196,11 +196,14 @@ export class CalendarView extends BasesView {
             onEventDrop={(entry, newStart, newEnd, allDay) =>
               this.updateEntryDates(entry, newStart, newEnd, allDay)
             }
-            onEventResize={(entry, newStart, newEnd) =>
-              this.updateEntryDuration(entry, newStart, newEnd)
+            onEventResize={(entry, newStart, newEnd, allDay) =>
+              allDay
+                ? this.updateEntryAllDayEnd(entry, newStart, newEnd)
+                : this.updateEntryDuration(entry, newStart, newEnd)
             }
             editable={this.isEditable()}
             resizeEditable={this.isResizeEditable()}
+            endDateEditable={this.isEndDateEditable()}
             calendarHandleRef={this.calendarHandleRef}
           />
         </AppContext.Provider>
@@ -224,6 +227,12 @@ export class CalendarView extends BasesView {
     if (!this.isEditable()) return false;
     const property = this.endDateProp ?? this.durationProp;
     return Boolean(property && parsePropertyId(property).type === "note");
+  }
+
+  private isEndDateEditable(): boolean {
+    return this.isEditable() && Boolean(
+      this.endDateProp && parsePropertyId(this.endDateProp).type === "note",
+    );
   }
 
   private extractDuration(entry: BasesEntry, propId: BasesPropertyId): number | undefined {
@@ -378,6 +387,23 @@ export class CalendarView extends BasesView {
       frontmatter[field] = this.endDateProp
         ? formatDateTime(newEnd)
         : Math.round(milliseconds / 60_000);
+    });
+  }
+
+  private async updateEntryAllDayEnd(
+    entry: BasesEntry,
+    newStart: Date,
+    inclusiveEnd: Date,
+  ): Promise<void> {
+    const field = this.endDateProp?.startsWith("note.")
+      ? this.endDateProp.slice(5)
+      : null;
+    if (!field || !Number.isFinite(inclusiveEnd.getTime()) ||
+        formatDate(inclusiveEnd) < formatDate(newStart)) {
+      throw new Error("Invalid all-day event end date");
+    }
+    await this.app.fileManager.processFrontMatter(entry.file, (frontmatter) => {
+      frontmatter[field] = formatDate(inclusiveEnd);
     });
   }
 
