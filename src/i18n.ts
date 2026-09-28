@@ -3,10 +3,12 @@ import { getLanguage } from "obsidian";
 const translations = {
   en: {
     calendar: "Calendar", empty: "Configure a start date property to display entries",
-    zoomIn: "Zoom in", zoomOut: "Zoom out", workWeek: "Work week", threeDay: "3 day", today: "Today",
+    zoomIn: "Zoom in", zoomOut: "Zoom out", workWeek: "Work week", threeDay: "3 day", dayView: "Day", today: "Today",
     move: "Move events", stopMove: "Stop moving",
     reschedule: "Reschedule", openNote: "Open note", openTab: "Open in new tab", deleteFile: "Delete file",
     dateProperties: "Date properties", startDate: "Start date", endDate: "End date (optional)",
+    dateSources: "Multiple date sources", dateSourcesHint: "Advanced: roles from one note (JSON or YAML list)",
+    filterEvents: "Filter calendar entries", viewMenu: "Range, view and zoom", goToDate: "Go to date…", previous: "Previous", next: "Next", monthView: "Month", weekView: "Week", showAll: "Show all", onlyThis: "Only this",
     duration: "Duration in minutes (optional)", property: "Property", eventDisplay: "Event display",
     detailProperty: "Detail property", detailHint: "Property shown on 2nd line (e.g. people)",
     colorProperty: "Color property", colorHint: "Property (e.g. tomato, sage, peacock…)",
@@ -22,10 +24,12 @@ const translations = {
   },
   pl: {
     calendar: "Kalendarz", empty: "Skonfiguruj właściwość daty początkowej, aby wyświetlić wpisy",
-    zoomIn: "Powiększ", zoomOut: "Pomniejsz", workWeek: "Tydzień roboczy", threeDay: "3 dni", today: "Dziś",
-    move: "Przesuwaj spotkania", stopMove: "Zakończ przesuwanie",
+    zoomIn: "Powiększ", zoomOut: "Pomniejsz", workWeek: "Tydzień roboczy", threeDay: "3 dni", dayView: "Dzień", today: "Dziś",
+    move: "Przesuń terminy", stopMove: "Zakończ przesuwanie",
     reschedule: "Zmień termin", openNote: "Otwórz notatkę", openTab: "Otwórz w nowej karcie", deleteFile: "Usuń plik",
     dateProperties: "Właściwości daty", startDate: "Data początkowa", endDate: "Data końcowa (opcjonalnie)",
+    dateSources: "Wiele źródeł daty", dateSourcesHint: "Zaawansowane: role z jednej notatki (lista JSON lub YAML)",
+    filterEvents: "Filtruj wpisy kalendarza", viewMenu: "Zakres, widok i powiększenie", goToDate: "Idź do daty…", previous: "Wstecz", next: "Dalej", monthView: "Miesiąc", weekView: "Tydzień", showAll: "Pokaż wszystkie", onlyThis: "Tylko ta",
     duration: "Czas trwania w minutach (opcjonalnie)", property: "Właściwość", eventDisplay: "Wyświetlanie wydarzeń",
     detailProperty: "Dodatkowa właściwość", detailHint: "Właściwość w drugim wierszu (np. osoby)",
     colorProperty: "Właściwość koloru", colorHint: "Właściwość (np. tomato, sage, peacock…)",

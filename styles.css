@@ -35,18 +35,6 @@ body {
   min-height: 0;
 }
 
-body.is-phone .bases-calendar-move-mode-button {
-  align-self: flex-end;
-  min-height: 44px;
-  margin: 0 4px 4px;
-  padding: 0 12px;
-}
-
-body.is-phone .bases-calendar-move-mode-button[aria-pressed="true"] {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
 body.is-phone .bases-calendar-phone-moving {
   cursor: grab;
   touch-action: none;
@@ -544,4 +532,299 @@ body.is-phone .bases-calendar-reschedule-modal .bases-calendar-reschedule-action
   border-radius: 3px;
   padding: 0 3px;
   line-height: 1.4;
+}
+/* Core Bases reserves 60px under every .base view (room for the table footer,
+   --bases-view-padding: 0 0 60px). The calendar has no footer and scrolls its
+   own grid, so that strip is dead space; give it back to the calendar. */
+.workspace-leaf-content[data-type="bases"] .bases-view[data-view-type="calendar"] {
+	--bases-view-padding: 0;
+}
+
+/* Desktop: role filters are one scrollable row of toggles. Off is shown by
+   shape (dashed outline, strike-through), not by colour alone. */
+.bases-calendar-source-filters {
+	display: flex;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	gap: var(--size-4-1);
+	padding: var(--size-4-1) var(--size-4-2);
+	scrollbar-width: none;
+}
+
+.bases-calendar-source-filter {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.bases-calendar-source-filter[aria-pressed="false"] {
+	background: transparent;
+	box-shadow: none;
+	border: 1px dashed var(--background-modifier-border);
+	color: var(--text-faint);
+	text-decoration: line-through;
+}
+
+/* Phone: one toolbar row – ‹ Dziś › | title | view menu, filter menu. */
+body.is-phone .bases-calendar-container {
+	.fc-header-toolbar {
+		flex-wrap: nowrap;
+		padding: var(--size-4-1) var(--size-4-1) !important;
+	}
+
+	.fc-toolbar-chunk {
+		display: flex;
+		align-items: center;
+		min-width: 0;
+	}
+
+	.fc-toolbar-chunk:nth-child(2) {
+		flex: 1 1 auto;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.fc-toolbar-title {
+		font-size: var(--font-ui-medium) !important;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* Flat toolbar: phone --button-radius is a pill (standard #403), which
+	   turns every toolbar control and its focus ring into an oval. */
+	.fc .fc-button {
+		min-width: 40px;
+		min-height: 40px;
+		border-radius: var(--radius-s) !important;
+		touch-action: manipulation;
+
+		&:focus {
+			box-shadow: none !important;
+		}
+
+		&:focus-visible {
+			box-shadow: 0 0 0 var(--input-border-width-focus)
+				var(--background-modifier-border-focus) !important;
+		}
+	}
+
+	.fc-rangeMenu-button,
+	.fc-moveMode-button,
+	.fc-sourceMenu-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--size-2-1);
+	}
+
+	/* The range title is the view selector: reads like a select with its value. */
+	.fc-rangeMenu-button {
+		max-width: 100%;
+		min-width: 0;
+		color: var(--text-normal) !important;
+		font-size: var(--font-ui-medium) !important;
+		font-weight: 600 !important;
+	}
+
+	.bases-calendar-range-label {
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	.bases-calendar-range-chevron {
+		display: inline-flex;
+		flex-shrink: 0;
+		color: var(--text-muted);
+		--icon-size: var(--icon-xs);
+	}
+
+	/* Move mode on: accent icon on a soft tile, so it is obvious a touch now drags, not opens. */
+	.fc-moveMode-button[aria-pressed="true"] {
+		background-color: var(--background-modifier-active-hover) !important;
+		color: var(--text-accent) !important;
+	}
+
+	/* The range reads as the heading it replaces, not as a button. */
+	.fc-rangeMenu-button,
+	.fc-rangeMenu-button:active {
+		background-color: transparent !important;
+		padding-inline: var(--size-2-2) !important;
+	}
+
+	.fc-sourceMenu-button.is-filtered {
+		color: var(--text-accent) !important;
+	}
+}
+
+/* Phone filter popover: stays open while roles are toggled; closes on a tap
+   outside, Escape or a second tap on the filter icon. */
+.bases-calendar-source-popover {
+	position: fixed;
+	z-index: var(--layer-menu);
+	display: flex;
+	flex-direction: column;
+	min-width: 14rem;
+	max-width: 96vw;
+	max-height: 70vh;
+	overflow-y: auto;
+	padding: var(--size-2-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+	box-shadow: var(--shadow-s);
+}
+
+.bases-calendar-source-popover-all {
+	align-self: flex-end;
+	margin-bottom: var(--size-2-2);
+}
+
+.bases-calendar-source-popover-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 44px;
+}
+
+.bases-calendar-source-popover-row label {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 44px;
+	touch-action: manipulation;
+}
+
+.bases-calendar-source-popover-row .clickable-icon {
+	min-height: 44px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+/* Phone toolbar (React, not FullCalendar): ‹ Dziś › | range ▾ | move, filter.
+   Flat controls with a small radius; the phone --button-radius is a pill. */
+.bases-calendar-phone-toolbar {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	padding: var(--size-2-2) var(--size-4-1);
+}
+
+.bases-calendar-phone-group {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+.bases-calendar-phone-toolbar button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--size-2-1);
+	min-width: 40px;
+	min-height: 40px;
+	padding: 0 var(--size-2-3);
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	touch-action: manipulation;
+}
+
+.bases-calendar-phone-toolbar button:focus {
+	box-shadow: none;
+}
+
+.bases-calendar-phone-toolbar button:focus-visible {
+	box-shadow: 0 0 0 var(--input-border-width-focus) var(--background-modifier-border-focus);
+}
+
+.bases-calendar-phone-toolbar .bases-calendar-range-button {
+	flex: 1 1 auto;
+	min-width: 0;
+	color: var(--text-normal);
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+}
+
+.bases-calendar-icon {
+	display: inline-flex;
+}
+
+.bases-calendar-range-chevron {
+	flex-shrink: 0;
+	color: var(--text-muted);
+	--icon-size: var(--icon-xs);
+}
+
+/* Move mode on: accent icon on a soft tile – a touch now drags, not opens. */
+.bases-calendar-phone-toolbar .bases-calendar-move-toggle.is-active {
+	background-color: var(--background-modifier-active-hover);
+	color: var(--text-accent);
+}
+
+.bases-calendar-phone-toolbar .bases-calendar-filter-button.is-filtered {
+	color: var(--text-accent);
+}
+
+/* Phone move mode: the end resizer of a selected block becomes a visible
+   grip (FullCalendar draws an 8px dot) with a wide touch band under it.
+   The band reaches 12px into the block and 16px below it, so the middle of
+   the block still moves the whole event. */
+/* The block clips its content (overflow: hidden above); the selected block
+   must not clip the grip and its touch band, or the part below the block is
+   dead. The text stays clipped by .fc-event-main. */
+.bases-calendar-container .bases-calendar-react-shell.is-moving .fc-timegrid-event.fc-event-selected {
+	overflow: visible !important;
+}
+
+.bases-calendar-react-shell.is-moving .fc-v-event.fc-event-selected .fc-event-resizer-end {
+	left: 50%;
+	width: 32px;
+	height: 6px;
+	margin-left: -16px;
+	bottom: -3px;
+	border: 1px solid var(--text-muted);
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+}
+
+.bases-calendar-react-shell.is-moving .fc-v-event.fc-event-selected .fc-event-resizer-end::before {
+	top: -12px;
+	bottom: -16px;
+	left: -60px;
+	right: -60px;
+}
+
+.bases-calendar-live-time {
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* Hidden anchor for the native date picker behind "Go to date". */
+.bases-calendar-date-jump {
+	position: fixed;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.bases-calendar-source-badge:empty {
+	display: none;
+}
+
+.bases-calendar-source-badge {
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+}
+
+.bases-calendar-event-role {
+	font-weight: 600;
 }
