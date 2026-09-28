@@ -545,29 +545,89 @@ body.is-phone .bases-calendar-reschedule-modal .bases-calendar-reschedule-action
   padding: 0 3px;
   line-height: 1.4;
 }
+/* Core Bases reserves 60px under every .base view (room for the table footer,
+   --bases-view-padding: 0 0 60px). The calendar has no footer and scrolls its
+   own grid, so that strip is dead space; give it back to the calendar. */
+.workspace-leaf-content[data-type="bases"] .bases-view[data-view-type="calendar"] {
+	--bases-view-padding: 0;
+}
+
+/* Desktop: role filters are one scrollable row of toggles. Off is shown by
+   shape (dashed outline, strike-through), not by colour alone. */
 .bases-calendar-source-filters {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 0.35rem;
-	padding: 0.4rem 0.6rem;
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	gap: var(--size-4-1);
+	padding: var(--size-4-1) var(--size-4-2);
+	scrollbar-width: none;
 }
 
 .bases-calendar-source-filter {
-	min-height: 40px;
-	padding: 0.2rem 0.65rem;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-m);
-	background: var(--background-secondary);
-	color: var(--text-muted);
+	flex: 0 0 auto;
+	white-space: nowrap;
 }
 
-body.is-phone .bases-calendar-source-filter {
-	min-height: 44px;
+.bases-calendar-source-filter[aria-pressed="false"] {
+	background: transparent;
+	box-shadow: none;
+	border: 1px dashed var(--background-modifier-border);
+	color: var(--text-faint);
+	text-decoration: line-through;
 }
 
-.bases-calendar-source-filter[aria-pressed="true"] {
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
+/* Phone: one toolbar row – ‹ Dziś › | title | view menu, filter menu. */
+body.is-phone .bases-calendar-container {
+	.fc-header-toolbar {
+		flex-wrap: nowrap;
+		padding: var(--size-4-1) var(--size-4-1) !important;
+	}
+
+	.fc-toolbar-chunk {
+		display: flex;
+		align-items: center;
+		min-width: 0;
+	}
+
+	.fc-toolbar-chunk:nth-child(2) {
+		flex: 1 1 auto;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.fc-toolbar-title {
+		font-size: var(--font-ui-medium) !important;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.fc .fc-button {
+		min-width: 40px;
+		min-height: 40px;
+		touch-action: manipulation;
+	}
+
+	.fc-viewMenu-button,
+	.fc-sourceMenu-button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--size-2-1);
+	}
+
+	.fc-sourceMenu-button.is-filtered {
+		color: var(--text-accent) !important;
+	}
+}
+
+.bases-calendar-source-badge:empty {
+	display: none;
+}
+
+.bases-calendar-source-badge {
+	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
 }
 
 .bases-calendar-event-role {

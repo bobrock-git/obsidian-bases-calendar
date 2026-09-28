@@ -11,13 +11,14 @@ import interactionPlugin, { type EventResizeDoneArg } from "@fullcalendar/intera
 import FullCalendar from "@fullcalendar/react";
 import plLocale from "@fullcalendar/core/locales/pl";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import { BasesEntry, BasesPropertyId, DateValue, Platform, Value } from "obsidian";
+import { BasesEntry, BasesPropertyId, DateValue, Menu, Platform, Value, setIcon } from "obsidian";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
+import { CALENDAR_VIEWS, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
@@ -103,10 +104,59 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     [onZoomChange],
   );
 
+  const shellRef = useRef<HTMLDivElement>(null);
+  const sourceLabelsRef = useRef<[string, string][]>([]);
+  const hiddenSourcesRef = useRef<string[]>([]);
+
+  const showAtButton = (menu: Menu, el: HTMLElement) => {
+    const rect = el.getBoundingClientRect();
+    menu.showAtPosition({ x: rect.left, y: rect.bottom });
+  };
+
+  const viewLabel = (view: string): string => ({
+    dayGridMonth: t("monthView"), timeGridWeek: t("weekView"), workWeek: t("workWeek"),
+    threeDay: t("threeDay"), timeGridDay: t("dayView"),
+  } as Record<string, string>)[view] ?? view;
+
   const customButtons = useMemo(
     () => ({
       zoomIn:  { text: "+", hint: t("zoomIn"),  click: () => handleZoom("in") },
       zoomOut: { text: "−", hint: t("zoomOut"), click: () => handleZoom("out") },
+      // Phone only: the view switcher and zoom collapse into one icon menu.
+      viewMenu: {
+        text: "", hint: t("viewMenu"),
+        click: (_evt: MouseEvent, el: HTMLElement) => {
+          const api = calendarRef.current?.getApi();
+          if (!api) return;
+          const menu = new Menu();
+          for (const view of CALENDAR_VIEWS) {
+            menu.addItem((item) => item.setTitle(viewLabel(view))
+              .setChecked(api.view.type === view)
+              .onClick(() => api.changeView(view)));
+          }
+          menu.addSeparator();
+          menu.addItem((item) => item.setTitle(t("zoomIn")).setIcon("zoom-in").onClick(() => handleZoom("in")));
+          menu.addItem((item) => item.setTitle(t("zoomOut")).setIcon("zoom-out").onClick(() => handleZoom("out")));
+          showAtButton(menu, el);
+        },
+      },
+      // Phone only: source filter chips collapse into one checklist menu.
+      sourceMenu: {
+        text: "", hint: t("filterEvents"),
+        click: (_evt: MouseEvent, el: HTMLElement) => {
+          const menu = new Menu();
+          for (const [id, label] of sourceLabelsRef.current) {
+            menu.addItem((item) => item.setTitle(label)
+              .setChecked(!hiddenSourcesRef.current.includes(id))
+              .onClick(() => setHiddenSources((current) => toggleSource(current, id))));
+          }
+          if (hiddenSourcesRef.current.length > 0) {
+            menu.addSeparator();
+            menu.addItem((item) => item.setTitle(t("showAll")).setIcon("eye").onClick(() => setHiddenSources([])));
+          }
+          showAtButton(menu, el);
+        },
+      },
     }),
     [handleZoom],
   );
@@ -127,6 +177,31 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   const sourceLabels = Array.from(new Map(entries
     .filter((item) => item.source)
     .map((item) => [item.source!.id, item.source!.label])).entries());
+  sourceLabelsRef.current = sourceLabels;
+  hiddenSourcesRef.current = hiddenSources;
+  const toolbar = toolbarLayout(Platform.isPhone, sourceLabels.length > 1);
+
+  // FullCalendar renders custom buttons as plain text; give the phone menus
+  // Obsidian icons and keep the filter badge in sync with the hidden roles.
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    const viewButton = shell.querySelector<HTMLElement>(".fc-viewMenu-button");
+    if (viewButton && !viewButton.querySelector("svg")) setIcon(viewButton, "calendar-days");
+    const sourceButton = shell.querySelector<HTMLElement>(".fc-sourceMenu-button");
+    if (sourceButton) {
+      if (!sourceButton.querySelector("svg")) setIcon(sourceButton, "filter");
+      let badge = sourceButton.querySelector<HTMLElement>(".bases-calendar-source-badge");
+      const text = sourceBadge(sourceLabels.length, hiddenSources.length);
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "bases-calendar-source-badge";
+        sourceButton.appendChild(badge);
+      }
+      badge.textContent = text;
+      sourceButton.toggleClass("is-filtered", text !== "");
+    }
+  });
   const events = entries.filter((item) => !item.source || !hiddenSources.includes(item.source.id)).map((calEntry) => {
     // FullCalendar treats allDay end dates as exclusive; add one day to make inclusive.
     let adjustedEndDate = calEntry.endDate;
@@ -526,14 +601,13 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   }, []);
 
   return (
-    <div className={`bases-calendar-react-shell${Platform.isPhone && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
-      {sourceLabels.length > 1 && (
+    <div ref={shellRef} className={`bases-calendar-react-shell${Platform.isPhone && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
+      {!Platform.isPhone && sourceLabels.length > 1 && (
         <div className="bases-calendar-source-filters" role="group" aria-label={t("filterEvents")}>
           {sourceLabels.map(([id, label]) => (
             <button key={id} type="button" aria-pressed={!hiddenSources.includes(id)}
               className="bases-calendar-source-filter"
-              onClick={() => setHiddenSources((current) => current.includes(id)
-                ? current.filter((item) => item !== id) : [...current, id])}>
+              onClick={() => setHiddenSources((current) => toggleSource(current, id))}>
               {label}
             </button>
           ))}
@@ -573,11 +647,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         timeGridDay: { buttonText: t("dayView") },
       }}
       firstDay={weekStartDay}
-      headerToolbar={{
-        left: "title",
-        center: "",
-        right: "dayGridMonth,timeGridWeek,workWeek,threeDay,timeGridDay prev,today,next zoomOut,zoomIn",
-      }}
+      headerToolbar={toolbar}
+      titleFormat={Platform.isPhone ? phoneTitleFormat(activeView) : undefined}
       customButtons={customButtons}
       buttonText={{ today: t("today") }}
       nowIndicator={true}
