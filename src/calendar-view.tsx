@@ -7,6 +7,7 @@ import {
   Menu,
   Modal,
   Notice,
+  Platform,
   Setting,
   parsePropertyId,
   QueryController,
@@ -227,9 +228,45 @@ export class CalendarView extends BasesView {
 
   private showEntryContextMenu(evt: MouseEvent, entry: BasesEntry): void {
     const file = entry.file;
+    const calendarEntry = this.entries.find((item) => item.entry.file.path === file.path);
+    if (Platform.isPhone) {
+      // A shared context menu also receives actions for links rendered inside the
+      // event. A private menu keeps this menu about the event's own note.
+      const menu = new Menu();
+      if (this.isEditable() && calendarEntry) {
+        menu.addItem((item) =>
+          item
+            .setSection("reschedule")
+            .setTitle("Zmień termin")
+            .setIcon("calendar-clock")
+            .onClick(() => {
+              new RescheduleModal(this.app, calendarEntry, (start, end, allDay) =>
+                this.updateEntryDates(entry, start, end, allDay),
+              ).open();
+            }),
+        );
+        menu.addSeparator();
+      }
+      menu.addItem((item) =>
+        item
+          .setSection("navigation")
+          .setTitle("Otwórz notatkę")
+          .setIcon("file-text")
+          .onClick(() => void this.app.workspace.openLinkText(file.path, "", false)),
+      );
+      menu.addItem((item) =>
+        item
+          .setSection("navigation")
+          .setTitle("Otwórz w nowej karcie")
+          .setIcon("file-plus")
+          .onClick(() => void this.app.workspace.openLinkText(file.path, "", true)),
+      );
+      menu.showAtMouseEvent(evt);
+      return;
+    }
+
     const menu = Menu.forEvent(evt);
     this.app.workspace.handleLinkContextMenu(menu, file.path, "");
-    const calendarEntry = this.entries.find((item) => item.entry.file.path === file.path);
     if (this.isEditable() && calendarEntry) {
       menu.addItem((item) =>
         item
@@ -378,6 +415,7 @@ class RescheduleModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     const { startDate, endDate, allDay } = this.calendarEntry;
+    this.modalEl.addClass("bases-calendar-reschedule-modal");
     contentEl.empty();
     contentEl.createEl("h2", { text: "Zmień termin" });
 
@@ -390,6 +428,27 @@ class RescheduleModal extends Modal {
       dateInput.value = formatDate(startDate);
       dateInput.setAttribute("aria-label", "Nowa data");
     });
+    const shortcuts = contentEl.createDiv({ cls: "bases-calendar-date-shortcuts" });
+    for (const [label, days] of [
+      ["Dziś", 0],
+      ["Jutro", 1],
+      ["Pojutrze", 2],
+      ["Za tydzień", 7],
+    ] as const) {
+      const target = new Date();
+      target.setDate(target.getDate() + days);
+      const day = formatDate(target);
+      const button = shortcuts.createEl("button", {
+        cls: "bases-calendar-date-shortcut",
+        attr: { type: "button", "aria-label": `${label}, ${day}` },
+      });
+      button.createSpan({ text: label });
+      button.createSpan({ text: target.toLocaleDateString("pl-PL"), cls: "bases-calendar-date-shortcut-value" });
+      button.addEventListener("click", () => {
+        dateInput.value = day;
+        dateInput.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
     new Setting(contentEl).setName("Cały dzień").addToggle((toggle) => {
       toggle.setValue(allDay).onChange((value) => {
         selectedAllDay = value;
@@ -404,7 +463,7 @@ class RescheduleModal extends Modal {
       timeInput.setAttribute("aria-label", "Nowa godzina");
     });
 
-    new Setting(contentEl)
+    new Setting(contentEl).setClass("bases-calendar-reschedule-actions")
       .addButton((button) =>
         button.setButtonText("Anuluj").onClick(() => this.close()),
       )
