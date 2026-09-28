@@ -17,6 +17,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
 import { isPhoneLayout } from "./platform";
+import { toIsoDay } from "./view-state";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
 import { entryClassNames } from "./entry-style";
@@ -34,17 +35,22 @@ const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
 export interface CalendarHandle {
   updateSize(): void;
+  /** Returns an already mounted calendar to a remembered view and day. */
+  restore(view: string, date?: string): void;
 }
 
 interface CalendarReactViewProps {
   entries: CalendarEntry[];
   weekStartDay: number;
   initialView: string;
+  /** First visible day to open on (`YYYY-MM-DD`); today when absent. */
+  initialDate?: string;
   initialSlotDuration: string;
   scrollToTime: string;
   detailProperty: BasesPropertyId | null;
   properties: BasesPropertyId[];
   onViewChange: (view: string) => void;
+  onDateChange: (date: string) => void;
   onZoomChange: (slotDuration: string) => void;
   onEntryClick: (entry: BasesEntry, isModEvent: boolean) => void;
   onEntryContextMenu: (evt: React.MouseEvent, entry: CalendarEntry) => void;
@@ -68,11 +74,13 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   entries,
   weekStartDay,
   initialView,
+  initialDate,
   initialSlotDuration,
   scrollToTime,
   detailProperty,
   properties,
   onViewChange,
+  onDateChange,
   onZoomChange,
   onEntryClick,
   onEntryContextMenu,
@@ -266,6 +274,12 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     if (calendarHandleRef) {
       (calendarHandleRef as React.RefObject<CalendarHandle | null>).current = {
         updateSize: () => calendarRef.current?.getApi().updateSize(),
+        restore: (view, date) => {
+          const api = calendarRef.current?.getApi();
+          if (!api) return;
+          if (api.view.type !== view) api.changeView(view);
+          if (date) api.gotoDate(date);
+        },
       };
     }
     return () => {
@@ -766,6 +780,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       locales={[plLocale]}
       locale={language()}
       initialView={initialView}
+      initialDate={initialDate}
       views={{
         // Month auto-sizes to show all week rows (no inner scroll needed).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -813,7 +828,10 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       }}
       eventResize={(info) => void handleEventResize(info)}
       viewDidMount={handleViewDidMount}
-      datesSet={(arg) => setRangeTitle(arg.view.title)}
+      datesSet={(arg) => {
+        setRangeTitle(arg.view.title);
+        onDateChange(toIsoDay(arg.view.currentStart));
+      }}
       height="100%"
       fixedWeekCount={false}
       fixedMirrorParent={document.body ?? undefined}
