@@ -56,6 +56,14 @@ body.is-phone .bases-calendar-phone-moving a {
   pointer-events: none;
 }
 
+body.is-phone .bases-calendar-three-day .fc-timegrid-slot {
+  height: 44px;
+}
+
+body.is-phone .bases-calendar-three-day .fc-daygrid-event {
+  min-height: 44px;
+}
+
 /* Embedded in a markdown note: parent has no intrinsic height, so use the
    CSS variable (default 600px) to give the container a defined size. */
 .markdown-rendered .bases-calendar-container {
