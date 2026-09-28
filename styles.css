@@ -300,6 +300,53 @@ body {
   max-width: 100%;
 }
 
+.bases-calendar-event-details {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* The phone handle is the only drag origin; text and links remain tappable. */
+body.is-phone .bases-calendar-container .bases-calendar-phone-draggable .bases-calendar-event-content {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+}
+
+body.is-phone .bases-calendar-container .bases-calendar-phone-draggable .bases-calendar-event-details {
+  flex: 1 1 auto;
+  padding: 4px 6px;
+}
+
+body.is-phone .bases-calendar-container .bases-calendar-drag-handle {
+  display: flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-height: 44px;
+  border-right: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  touch-action: none;
+  cursor: grab;
+}
+
+body.is-phone .bases-calendar-container .bases-calendar-drag-handle-mark {
+  width: 13px;
+  height: 22px;
+  background-image: radial-gradient(currentColor 1.5px, transparent 2px);
+  background-size: 6px 7px;
+}
+
+body.is-phone .bases-calendar-container .fc-daygrid-event.bases-calendar-phone-draggable {
+  min-height: 44px;
+}
+
+body.is-phone .bases-calendar-container .fc-timegrid-slot {
+  height: 44px;
+}
+
 .bases-calendar-event-title {
   display: block;
   font-weight: var(--font-semibold);

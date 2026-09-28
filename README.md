@@ -159,6 +159,8 @@ Dragging is disabled when date properties come from computed or file-metadata so
 
 Timed events can also be resized by dragging their bottom edge. The new end time is written to `endDate` when it is configured; otherwise the new length is written to `durationProperty` as minutes. Resizing requires the target to be a frontmatter property. Date-only events cannot be resized.
 
+On phones, draggable events show a dotted handle on the left. Hold and drag that handle to move an event; tapping the rest of the event or its links still opens them. Desktop and tablet dragging stays on the whole event.
+
 ---
 
 ## View modes

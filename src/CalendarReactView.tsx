@@ -3,19 +3,30 @@ import type {
   EventClickArg,
   EventContentArg,
   EventDropArg,
+  EventMountArg,
   ViewMountArg,
 } from "@fullcalendar/core";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin, { type EventResizeDoneArg } from "@fullcalendar/interaction";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import { BasesEntry, BasesPropertyId, DateValue, Value } from "obsidian";
+import { BasesEntry, BasesPropertyId, DateValue, Platform, Value } from "obsidian";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
+
+function stopPhoneDragOutsideHandle(event: Event): void {
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    !target.closest(".bases-calendar-drag-handle, .fc-event-resizer")
+  ) {
+    event.stopPropagation();
+  }
+}
 
 export interface CalendarHandle {
   updateSize(): void;
@@ -64,6 +75,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   calendarHandleRef,
 }) => {
   const app = useApp();
+  const showPhoneDragHandle = Platform.isPhone && editable;
   const calendarRef = useRef<FullCalendar>(null);
   const [slotDuration, setSlotDuration] = useState(initialSlotDuration);
   const slotDurationRef = useRef(initialSlotDuration);
@@ -158,6 +170,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       if (target.closest(".internal-link")) return;
       const clickedExternal = target.closest("a.external-link") as HTMLAnchorElement | undefined;
       if (clickedExternal?.href) return;
+      if (target.closest(".bases-calendar-drag-handle")) return;
 
       clickInfo.jsEvent.preventDefault();
       onEntryClick(entry, isModEvent);
@@ -403,18 +416,30 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
 
       return (
         <div className="bases-calendar-event-content">
-          <div className="bases-calendar-event-title">
-            {titleProp
-              ? <ListPropertyValue value={titleProp.value} maxItems={1} />
-              : entry.file.basename}
-          </div>
-          {detailNode && (
-            <div className="bases-calendar-event-properties">{detailNode}</div>
+          {showPhoneDragHandle && (
+            <span
+              className="bases-calendar-drag-handle"
+              role="img"
+              aria-label="Hold and drag to reschedule"
+              title="Hold and drag to reschedule"
+            >
+              <span className="bases-calendar-drag-handle-mark" aria-hidden="true" />
+            </span>
           )}
+          <div className="bases-calendar-event-details">
+            <div className="bases-calendar-event-title">
+              {titleProp
+                ? <ListPropertyValue value={titleProp.value} maxItems={1} />
+                : entry.file.basename}
+            </div>
+            {detailNode && (
+              <div className="bases-calendar-event-properties">{detailNode}</div>
+            )}
+          </div>
         </div>
       );
     },
-    [properties, detailProperty, app, hasNonEmptyValue],
+    [properties, detailProperty, app, hasNonEmptyValue, showPhoneDragHandle],
   );
 
   const handleViewDidMount = useCallback(
@@ -423,6 +448,19 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     },
     [onViewChange],
   );
+
+  const handleEventDidMount = useCallback((info: EventMountArg) => {
+    if (!showPhoneDragHandle) return;
+    // FullCalendar listens above the event element. Filtering here leaves link
+    // handlers on the target intact and lets only the handle start a drag.
+    info.el.addEventListener("touchstart", stopPhoneDragOutsideHandle);
+    info.el.addEventListener("mousedown", stopPhoneDragOutsideHandle);
+  }, [showPhoneDragHandle]);
+
+  const handleEventWillUnmount = useCallback((info: EventMountArg) => {
+    info.el.removeEventListener("touchstart", stopPhoneDragOutsideHandle);
+    info.el.removeEventListener("mousedown", stopPhoneDragOutsideHandle);
+  }, []);
 
   return (
     <FullCalendar
@@ -458,10 +496,13 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       scrollTime={scrollToTime}
       slotDuration={slotDuration}
       slotEventOverlap={false}
-      eventMinHeight={20}
+      eventMinHeight={Platform.isPhone ? 44 : 20}
       navLinks={false}
       events={events}
       eventContent={renderEventContent}
+      eventClassNames={showPhoneDragHandle ? ["bases-calendar-phone-draggable"] : []}
+      eventDidMount={handleEventDidMount}
+      eventWillUnmount={handleEventWillUnmount}
       eventClick={handleEventClick}
       eventMouseEnter={handleEventMouseEnter}
       eventDrop={(info) => void handleEventDrop(info)}
