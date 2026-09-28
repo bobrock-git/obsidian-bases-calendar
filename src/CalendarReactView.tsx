@@ -36,17 +36,20 @@ interface CalendarReactViewProps {
   onViewChange: (view: string) => void;
   onZoomChange: (slotDuration: string) => void;
   onEntryClick: (entry: BasesEntry, isModEvent: boolean) => void;
-  onEntryContextMenu: (evt: React.MouseEvent, entry: BasesEntry) => void;
+  onEntryContextMenu: (evt: React.MouseEvent, entry: CalendarEntry) => void;
   onEventDrop?: (
-    entry: BasesEntry,
+    entry: CalendarEntry,
     newStart: Date,
     newEnd?: Date,
     allDay?: boolean,
   ) => Promise<void>;
-  onEventResize?: (entry: BasesEntry, newStart: Date, newEnd: Date, allDay: boolean) => Promise<void>;
+  onEventResize?: (entry: CalendarEntry, newStart: Date, newEnd: Date, allDay: boolean) => Promise<void>;
   editable: boolean;
   resizeEditable: boolean;
   endDateEditable: boolean;
+  canEditEntry: (entry: CalendarEntry) => boolean;
+  canResizeEntry: (entry: CalendarEntry) => boolean;
+  canResizeAllDayEntry: (entry: CalendarEntry) => boolean;
   calendarHandleRef?: React.RefObject<CalendarHandle | null>;
 }
 
@@ -67,6 +70,9 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   editable,
   resizeEditable,
   endDateEditable,
+  canEditEntry,
+  canResizeEntry,
+  canResizeAllDayEntry,
   calendarHandleRef,
 }) => {
   const app = useApp();
@@ -75,7 +81,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   const [moveMode, setMoveMode] = useState(false);
   const moveModeRef = useRef(moveMode);
   moveModeRef.current = moveMode;
-  const lastLongPressRef = useRef<{ path: string; at: number } | null>(null);
+  const lastLongPressRef = useRef<{ id: string; at: number } | null>(null);
+  const [hiddenSources, setHiddenSources] = useState<string[]>([]);
   const eventListenersRef = useRef(new WeakMap<HTMLElement, () => void>());
   const [slotDuration, setSlotDuration] = useState(initialSlotDuration);
   const slotDurationRef = useRef(initialSlotDuration);
@@ -117,7 +124,10 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     };
   }, [calendarHandleRef]);
 
-  const events = entries.map((calEntry) => {
+  const sourceLabels = Array.from(new Map(entries
+    .filter((item) => item.source)
+    .map((item) => [item.source!.id, item.source!.label])).entries());
+  const events = entries.filter((item) => !item.source || !hiddenSources.includes(item.source.id)).map((calEntry) => {
     // FullCalendar treats allDay end dates as exclusive; add one day to make inclusive.
     let adjustedEndDate = calEntry.endDate;
     if (calEntry.allDay && calEntry.endDate) {
@@ -145,16 +155,22 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     }
 
     return {
-      id: calEntry.entry.file.path,
-      title: calEntry.entry.file.basename,
+      id: calEntry.id,
+      title: calEntry.source
+        ? `${calEntry.source.label}: ${calEntry.entry.file.basename}`
+        : calEntry.entry.file.basename,
       start: calEntry.startDate,
       end: adjustedEndDate,
       allDay: calEntry.allDay,
-      durationEditable: calEntry.allDay ? endDateEditable : resizeEditable,
+      editable: canEditEntry(calEntry),
+      durationEditable: calEntry.allDay
+        ? canResizeAllDayEntry(calEntry)
+        : canResizeEntry(calEntry),
       backgroundColor: calEntry.backgroundColor,
       borderColor: calEntry.borderColor,
       extendedProps: {
         entry: calEntry.entry,
+        calendarEntry: calEntry,
         originalEndDate: calEntry.endDate,
         allDay: calEntry.allDay,
       },
@@ -168,7 +184,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       const isModEvent = clickInfo.jsEvent.ctrlKey || clickInfo.jsEvent.metaKey;
 
       const lastLongPress = lastLongPressRef.current;
-      if (moveMode || (lastLongPress?.path === entry.file.path && Date.now() - lastLongPress.at < 1000)) {
+      if (moveMode || (lastLongPress?.id === clickInfo.event.id && Date.now() - lastLongPress.at < 1000)) {
         clickInfo.jsEvent.preventDefault();
         return;
       }
@@ -208,7 +224,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         return;
       }
 
-      const entry = dropInfo.event.extendedProps.entry as BasesEntry;
+      const entry = dropInfo.event.extendedProps.calendarEntry as CalendarEntry;
       const originalEndDate = dropInfo.event.extendedProps.originalEndDate as Date | undefined;
       const allDay = dropInfo.event.allDay;
       const newStart = dropInfo.event.start;
@@ -263,7 +279,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
           resizeInfo.revert();
           return;
         }
-        await onEventResize(event.extendedProps.entry as BasesEntry, start, storedEnd, event.allDay);
+        await onEventResize(event.extendedProps.calendarEntry as CalendarEntry, start, storedEnd, event.allDay);
       } catch {
         resizeInfo.revert();
       }
@@ -354,6 +370,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       if (!app) return null;
 
       const entry = eventInfo.event.extendedProps.entry as BasesEntry;
+      const calendarEntry = eventInfo.event.extendedProps.calendarEntry as CalendarEntry;
 
       // Skip detail row for short timed events (≤20 min) to avoid overflow.
       const { start, end, allDay } = eventInfo.event;
@@ -409,6 +426,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         <div className="bases-calendar-event-content">
           <div className="bases-calendar-event-details">
             <div className="bases-calendar-event-title">
+              {calendarEntry.source && <span className="bases-calendar-event-role">{calendarEntry.source.label}: </span>}
               {titleProp
                 ? <ListPropertyValue value={titleProp.value} maxItems={1} />
                 : entry.file.basename}
@@ -450,9 +468,9 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       clearTimer();
       if (Platform.isPhone && moveModeRef.current) return;
       const previous = lastLongPressRef.current;
-      if (previous?.path === entry.file.path && Date.now() - previous.at < 1000 && evt.isTrusted) return;
+      if (previous?.id === info.event.id && Date.now() - previous.at < 1000 && evt.isTrusted) return;
       if (Platform.isPhone) {
-        lastLongPressRef.current = { path: entry.file.path, at: Date.now() };
+        lastLongPressRef.current = { id: info.event.id, at: Date.now() };
       }
       const syntheticEvent = {
         nativeEvent: evt,
@@ -461,7 +479,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         preventDefault: () => evt.preventDefault(),
         stopPropagation: () => evt.stopPropagation(),
       } as unknown as React.MouseEvent;
-      onEntryContextMenu(syntheticEvent, entry);
+      onEntryContextMenu(syntheticEvent, info.event.extendedProps.calendarEntry as CalendarEntry);
     };
     const onPointerDown = (evt: PointerEvent) => {
       if (!Platform.isPhone || moveModeRef.current || evt.pointerType !== "touch") return;
@@ -480,7 +498,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     };
     const onClickCapture = (evt: MouseEvent) => {
       const previous = lastLongPressRef.current;
-      if (previous?.path === entry.file.path && Date.now() - previous.at < 1000) {
+      if (previous?.id === info.event.id && Date.now() - previous.at < 1000) {
         evt.preventDefault();
         evt.stopImmediatePropagation();
       }
@@ -509,6 +527,18 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
 
   return (
     <div className={`bases-calendar-react-shell${Platform.isPhone && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
+      {sourceLabels.length > 1 && (
+        <div className="bases-calendar-source-filters" role="group" aria-label={t("calendar")}>
+          {sourceLabels.map(([id, label]) => (
+            <button key={id} type="button" aria-pressed={!hiddenSources.includes(id)}
+              className="bases-calendar-source-filter"
+              onClick={() => setHiddenSources((current) => current.includes(id)
+                ? current.filter((item) => item !== id) : [...current, id])}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {Platform.isPhone && editable && activeView === "threeDay" && (
         <button
           type="button"

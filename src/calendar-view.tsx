@@ -20,11 +20,14 @@ import { CalendarHandle, CalendarReactView } from "./CalendarReactView";
 import { AppContext } from "./context";
 import { resolveColor } from "./colors";
 import { locale, t } from "./i18n";
+import { DateSource, matchesDateSource, parseDateSources, sourceEventId } from "./date-sources";
 
 export const CalendarViewType = "calendar";
 
 export interface CalendarEntry {
+  id: string;
   entry: BasesEntry;
+  source?: DateSource;
   startDate: Date;
   endDate?: Date;
   durationMinutes?: number;
@@ -46,6 +49,8 @@ export class CalendarView extends BasesView {
   private durationProp: BasesPropertyId | null = null;
   private colorProp: BasesPropertyId | null = null;
   private detailProp: BasesPropertyId | null = null;
+  private dateSources: DateSource[] = [];
+  private sourceConfigError = "";
   private weekStartDay: number = 1;
   private scrollToTime: string = "08:00:00";
   private currentView: string = "workWeek";
@@ -102,6 +107,14 @@ export class CalendarView extends BasesView {
     this.durationProp = this.config.getAsPropertyId("durationProperty");
     this.colorProp = this.config.getAsPropertyId("colorProperty");
     this.detailProp = this.config.getAsPropertyId("detailProperty");
+    try {
+      this.dateSources = parseDateSources(this.config.get("dateSources"));
+      this.sourceConfigError = "";
+    } catch (error) {
+      this.dateSources = [];
+      this.sourceConfigError = String(error);
+      console.error("Invalid Bases Calendar dateSources:", error);
+    }
 
     const weekStartDayValue = this.config.get("weekStartDay") as string;
     const dayNameToNumber: Record<string, number> = {
@@ -117,51 +130,63 @@ export class CalendarView extends BasesView {
   }
 
   private updateCalendar(): void {
-    if (!this.data || !this.startDateProp) {
+    if (this.sourceConfigError || !this.data || (!this.startDateProp && !this.dateSources.length)) {
       this.root?.unmount();
       this.root = null;
       this.containerEl.empty();
       this.containerEl.createDiv("bases-calendar-empty").textContent =
-        t("empty");
+        this.sourceConfigError || t("empty");
       return;
     }
 
     this.entries = [];
     for (const entry of this.data.data) {
-      const result = this.extractDate(entry, this.startDateProp);
-      if (result) {
-        const endDate = this.endDateProp
-          ? (this.extractDate(entry, this.endDateProp)?.date ?? undefined)
-          : undefined;
-        const durationMinutes = this.durationProp
-          ? this.extractDuration(entry, this.durationProp)
-          : undefined;
-
-        let colorProps: Pick<CalendarEntry, "backgroundColor" | "borderColor"> = {};
-        if (this.colorProp) {
-          try {
-            const colorValue = entry.getValue(this.colorProp);
-            if (colorValue) {
-              const resolved = resolveColor(colorValue.toString());
-              if (resolved) colorProps = resolved;
-            }
-          } catch {
-            // skip
-          }
+      if (this.dateSources.length) {
+        for (const source of this.dateSources) {
+          if (!matchesDateSource(entry, source)) continue;
+          const item = this.buildCalendarEntry(entry, source.startDate, source.endDate,
+            source.durationProperty, source);
+          if (item) this.entries.push(item);
         }
-
-        this.entries.push({
-          entry,
-          startDate: result.date,
-          endDate,
-          durationMinutes,
-          allDay: !result.hasTimed,
-          ...colorProps,
-        });
+      } else if (this.startDateProp) {
+        const item = this.buildCalendarEntry(entry, this.startDateProp, this.endDateProp,
+          this.durationProp);
+        if (item) this.entries.push(item);
       }
     }
 
     this.renderReactCalendar();
+  }
+
+  private buildCalendarEntry(
+    entry: BasesEntry,
+    startProperty: BasesPropertyId,
+    endProperty?: BasesPropertyId | null,
+    durationProperty?: BasesPropertyId | null,
+    source?: DateSource,
+  ): CalendarEntry | null {
+    const result = this.extractDate(entry, startProperty);
+    if (!result) return null;
+    const endDate = endProperty ? this.extractDate(entry, endProperty)?.date : undefined;
+    const durationMinutes = durationProperty ? this.extractDuration(entry, durationProperty) : undefined;
+    let colorProps: Pick<CalendarEntry, "backgroundColor" | "borderColor"> = {};
+    try {
+      const color = this.colorProp ? entry.getValue(this.colorProp)?.toString() : source?.color;
+      const resolved = resolveColor(color || source?.color);
+      if (resolved) colorProps = resolved;
+    } catch {
+      // An invalid color does not hide a dated entry.
+    }
+    return {
+      id: source ? sourceEventId(entry.file.path, source.id) : entry.file.path,
+      entry,
+      source,
+      startDate: result.date,
+      endDate,
+      durationMinutes,
+      allDay: !result.hasTimed,
+      ...colorProps,
+    };
   }
 
   private renderReactCalendar(): void {
@@ -189,21 +214,24 @@ export class CalendarView extends BasesView {
                 isModEvent,
               );
             }}
-            onEntryContextMenu={(evt, entry) => {
+            onEntryContextMenu={(evt, calendarEntry) => {
               evt.preventDefault();
-              this.showEntryContextMenu(evt.nativeEvent, entry);
+              this.showEntryContextMenu(evt.nativeEvent, calendarEntry);
             }}
-            onEventDrop={(entry, newStart, newEnd, allDay) =>
-              this.updateEntryDates(entry, newStart, newEnd, allDay)
+            onEventDrop={(calendarEntry, newStart, newEnd, allDay) =>
+              this.updateEntryDates(calendarEntry, newStart, newEnd, allDay)
             }
-            onEventResize={(entry, newStart, newEnd, allDay) =>
+            onEventResize={(calendarEntry, newStart, newEnd, allDay) =>
               allDay
-                ? this.updateEntryAllDayEnd(entry, newStart, newEnd)
-                : this.updateEntryDuration(entry, newStart, newEnd)
+                ? this.updateEntryAllDayEnd(calendarEntry, newStart, newEnd)
+                : this.updateEntryDuration(calendarEntry, newStart, newEnd)
             }
             editable={this.isEditable()}
             resizeEditable={this.isResizeEditable()}
             endDateEditable={this.isEndDateEditable()}
+            canEditEntry={(item) => this.isEntryEditable(item)}
+            canResizeEntry={(item) => this.isEntryResizeEditable(item)}
+            canResizeAllDayEntry={(item) => this.isEntryEndDateEditable(item)}
             calendarHandleRef={this.calendarHandleRef}
           />
         </AppContext.Provider>
@@ -212,6 +240,8 @@ export class CalendarView extends BasesView {
   }
 
   private isEditable(): boolean {
+    if (this.dateSources.length) return this.dateSources.some((source) =>
+      this.isSourceEditable(source));
     if (!this.startDateProp) return false;
     const startDateProperty = parsePropertyId(this.startDateProp);
     if (startDateProperty.type !== "note") return false;
@@ -224,15 +254,41 @@ export class CalendarView extends BasesView {
   }
 
   private isResizeEditable(): boolean {
+    if (this.dateSources.length) return this.dateSources.some((source) =>
+      this.isSourceEditable(source) && Boolean(source.endDate || source.durationProperty));
     if (!this.isEditable()) return false;
     const property = this.endDateProp ?? this.durationProp;
     return Boolean(property && parsePropertyId(property).type === "note");
   }
 
   private isEndDateEditable(): boolean {
+    if (this.dateSources.length) return this.dateSources.some((source) =>
+      this.isSourceEditable(source) && Boolean(source.endDate));
     return this.isEditable() && Boolean(
       this.endDateProp && parsePropertyId(this.endDateProp).type === "note",
     );
+  }
+
+  private isSourceEditable(source: DateSource): boolean {
+    return Boolean(source.startDate.startsWith("note.") &&
+      (!source.endDate || source.endDate.startsWith("note.")) &&
+      (!source.durationProperty || source.durationProperty.startsWith("note.")));
+  }
+
+  private isEntryEditable(item: CalendarEntry): boolean {
+    return item.source ? this.isSourceEditable(item.source) : this.isEditable();
+  }
+
+  private isEntryResizeEditable(item: CalendarEntry): boolean {
+    if (!this.isEntryEditable(item)) return false;
+    return item.source
+      ? Boolean(item.source.endDate || item.source.durationProperty)
+      : this.isResizeEditable();
+  }
+
+  private isEntryEndDateEditable(item: CalendarEntry): boolean {
+    if (!this.isEntryEditable(item)) return false;
+    return item.source ? Boolean(item.source.endDate) : this.isEndDateEditable();
   }
 
   private extractDuration(entry: BasesEntry, propId: BasesPropertyId): number | undefined {
@@ -266,14 +322,13 @@ export class CalendarView extends BasesView {
     }
   }
 
-  private showEntryContextMenu(evt: MouseEvent, entry: BasesEntry): void {
-    const file = entry.file;
-    const calendarEntry = this.entries.find((item) => item.entry.file.path === file.path);
+  private showEntryContextMenu(evt: MouseEvent, calendarEntry: CalendarEntry): void {
+    const file = calendarEntry.entry.file;
     if (Platform.isPhone) {
       // A shared context menu also receives actions for links rendered inside the
       // event. A private menu keeps this menu about the event's own note.
       const menu = new Menu();
-      if (this.isEditable() && calendarEntry) {
+      if (this.isEntryEditable(calendarEntry)) {
         menu.addItem((item) =>
           item
             .setSection("reschedule")
@@ -281,7 +336,7 @@ export class CalendarView extends BasesView {
             .setIcon("calendar-clock")
             .onClick(() => {
               new RescheduleModal(this.app, calendarEntry, (start, end, allDay) =>
-                this.updateEntryDates(entry, start, end, allDay),
+                this.updateEntryDates(calendarEntry, start, end, allDay),
               ).open();
             }),
         );
@@ -307,7 +362,7 @@ export class CalendarView extends BasesView {
 
     const menu = Menu.forEvent(evt);
     this.app.workspace.handleLinkContextMenu(menu, file.path, "");
-    if (this.isEditable() && calendarEntry) {
+    if (this.isEntryEditable(calendarEntry)) {
       menu.addItem((item) =>
         item
           .setSection("action")
@@ -315,7 +370,7 @@ export class CalendarView extends BasesView {
           .setIcon("calendar-clock")
           .onClick(() => {
             new RescheduleModal(this.app, calendarEntry, (start, end, allDay) =>
-              this.updateEntryDates(entry, start, end, allDay),
+              this.updateEntryDates(calendarEntry, start, end, allDay),
             ).open();
           }),
       );
@@ -330,40 +385,74 @@ export class CalendarView extends BasesView {
     );
   }
 
+  private assertSourceUnchanged(item: CalendarEntry, frontmatter: Record<string, unknown>): void {
+    const source = item.source;
+    if (!source) return;
+    if (!source.types.includes(String(frontmatter.type ?? "")) ||
+        (source.statusProperty && source.statusEquals != null &&
+          String(frontmatter[source.statusProperty.slice(5)] ?? "") !== source.statusEquals) ||
+        (source.statusProperty && source.statusNot != null &&
+          String(frontmatter[source.statusProperty.slice(5)] ?? "") === source.statusNot)) {
+      throw new Error("The event no longer belongs to this calendar source");
+    }
+    const original = item.allDay ? formatDate(item.startDate) : formatDateTime(item.startDate);
+    const currentStart = frontmatter[source.startDate.slice(5)];
+    if (typeof currentStart === "string" && !currentStart.startsWith(original)) {
+      throw new Error("The event date changed since the calendar was loaded");
+    }
+    if (source.endDate) {
+      const rawEnd = frontmatter[source.endDate.slice(5)];
+      const current = typeof rawEnd === "string" ? rawEnd : "";
+      const previous = item.endDate
+        ? (item.allDay ? formatDate(item.endDate) : formatDateTime(item.endDate))
+        : "";
+      if (typeof rawEnd === "string" &&
+          (previous ? !current.startsWith(previous) : Boolean(current))) {
+        throw new Error("The event end changed since the calendar was loaded");
+      }
+    }
+  }
+
   private async updateEntryDates(
-    entry: BasesEntry,
+    item: CalendarEntry,
     newStart: Date,
     newEnd?: Date,
     allDay?: boolean,
   ): Promise<void> {
-    if (!this.startDateProp || !Number.isFinite(newStart.getTime())) {
+    const source = item.source;
+    const startProperty = source?.startDate ?? this.startDateProp;
+    const endProperty = source?.endDate ?? this.endDateProp;
+    if (!startProperty || !this.isEntryEditable(item) || !Number.isFinite(newStart.getTime()) ||
+        (source && !source.allowTime && !allDay)) {
       throw new Error("Invalid event start date");
     }
     if (newEnd && !Number.isFinite(newEnd.getTime())) {
       throw new Error("Invalid event end date");
     }
 
-    const file = entry.file;
-    const extractedStartProp = this.startDateProp.startsWith("note.")
-      ? this.startDateProp.slice(5)
+    const file = item.entry.file;
+    const extractedStartProp = startProperty.startsWith("note.")
+      ? startProperty.slice(5)
       : null;
-    const extractedEndProp = this.endDateProp?.startsWith("note.")
-      ? this.endDateProp.slice(5)
+    const extractedEndProp = endProperty?.startsWith("note.")
+      ? endProperty.slice(5)
       : null;
 
     if (
       extractedStartProp === null ||
-      (this.endDateProp && extractedEndProp === null)
+      (endProperty && extractedEndProp === null) ||
+      (newEnd && allDay && formatDate(newEnd) < formatDate(newStart))
     ) {
       throw new Error("Date properties are not editable note properties");
     }
 
     await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+      this.assertSourceUnchanged(item, frontmatter);
       frontmatter[extractedStartProp] = allDay
         ? formatDate(newStart)
         : formatDateTime(newStart);
 
-      if (this.endDateProp && newEnd && extractedEndProp) {
+      if (endProperty && newEnd && extractedEndProp) {
         frontmatter[extractedEndProp] = allDay
           ? formatDate(newEnd)
           : formatDateTime(newEnd);
@@ -372,38 +461,44 @@ export class CalendarView extends BasesView {
   }
 
   private async updateEntryDuration(
-    entry: BasesEntry,
+    item: CalendarEntry,
     newStart: Date,
     newEnd: Date,
   ): Promise<void> {
-    const property = this.endDateProp ?? this.durationProp;
+    if (!this.isEntryResizeEditable(item)) throw new Error("Event cannot be resized");
+    const endProperty = item.source?.endDate ?? this.endDateProp;
+    const property = endProperty ?? item.source?.durationProperty ?? this.durationProp;
     const field = property?.startsWith("note.") ? property.slice(5) : null;
     const milliseconds = newEnd.getTime() - newStart.getTime();
     if (!field || !Number.isFinite(milliseconds) || milliseconds < 60_000) {
       throw new Error("Invalid event duration");
     }
 
-    await this.app.fileManager.processFrontMatter(entry.file, (frontmatter) => {
-      frontmatter[field] = this.endDateProp
+    await this.app.fileManager.processFrontMatter(item.entry.file, (frontmatter) => {
+      this.assertSourceUnchanged(item, frontmatter);
+      frontmatter[field] = endProperty
         ? formatDateTime(newEnd)
         : Math.round(milliseconds / 60_000);
     });
   }
 
   private async updateEntryAllDayEnd(
-    entry: BasesEntry,
+    item: CalendarEntry,
     newStart: Date,
     inclusiveEnd: Date,
   ): Promise<void> {
-    const field = this.endDateProp?.startsWith("note.")
-      ? this.endDateProp.slice(5)
+    const endProperty = item.source?.endDate ?? this.endDateProp;
+    const field = endProperty?.startsWith("note.")
+      ? endProperty.slice(5)
       : null;
-    if (!field || !Number.isFinite(inclusiveEnd.getTime()) ||
+    if (!this.isEntryEndDateEditable(item) || !field || !Number.isFinite(inclusiveEnd.getTime()) ||
         formatDate(inclusiveEnd) < formatDate(newStart)) {
       throw new Error("Invalid all-day event end date");
     }
-    await this.app.fileManager.processFrontMatter(entry.file, (frontmatter) => {
-      frontmatter[field] = formatDate(inclusiveEnd);
+    await this.app.fileManager.processFrontMatter(item.entry.file, (frontmatter) => {
+      this.assertSourceUnchanged(item, frontmatter);
+      frontmatter[field] = item.source && formatDate(inclusiveEnd) === formatDate(newStart)
+        ? "" : formatDate(inclusiveEnd);
     });
   }
 
@@ -413,6 +508,12 @@ export class CalendarView extends BasesView {
         displayName: t("dateProperties"),
         type: "group",
         items: [
+          {
+            displayName: "Date sources (JSON or YAML list in .base)",
+            type: "text",
+            key: "dateSources",
+            placeholder: "Advanced: multiple dated roles per note",
+          },
           {
             displayName: t("startDate"),
             type: "property",
@@ -526,10 +627,16 @@ class RescheduleModal extends Modal {
     heading.createSpan({ text: title });
     const entityType = this.app.metadataCache.getFileCache(file)?.frontmatter?.type;
     if (typeof entityType === "string") void this.applyVaultEntityIcon(heading, entityType);
-    contentEl.createEl("p", { text: t("reschedule"), cls: "bases-calendar-reschedule-subtitle" });
+    contentEl.createEl("p", {
+      text: this.calendarEntry.source
+        ? `${t("reschedule")} — ${this.calendarEntry.source.label}`
+        : t("reschedule"),
+      cls: "bases-calendar-reschedule-subtitle",
+    });
 
     let dateInput!: HTMLInputElement;
-    let timeInput: HTMLInputElement;
+    let timeInput: HTMLInputElement | undefined;
+    const canSetTime = !this.calendarEntry.source || this.calendarEntry.source.allowTime;
     let selectedAllDay = allDay;
     new Setting(contentEl).setName(t("date")).addText((text) => {
       dateInput = text.inputEl;
@@ -598,19 +705,21 @@ class RescheduleModal extends Modal {
     dateInput.addEventListener("input", syncDateState);
     dateInput.addEventListener("change", syncDateState);
     syncDateState();
-    new Setting(contentEl).setName(t("allDay")).addToggle((toggle) => {
-      toggle.setValue(allDay).onChange((value) => {
-        selectedAllDay = value;
-        timeInput.disabled = value;
+    if (canSetTime) {
+      new Setting(contentEl).setName(t("allDay")).addToggle((toggle) => {
+        toggle.setValue(allDay).onChange((value) => {
+          selectedAllDay = value;
+          if (timeInput) timeInput.disabled = value;
+        });
       });
-    });
-    new Setting(contentEl).setName(t("time")).addText((text) => {
-      timeInput = text.inputEl;
-      timeInput.type = "time";
-      timeInput.value = allDay ? "09:00" : formatTime(startDate);
-      timeInput.disabled = allDay;
-      timeInput.setAttribute("aria-label", t("newTime"));
-    });
+      new Setting(contentEl).setName(t("time")).addText((text) => {
+        timeInput = text.inputEl;
+        timeInput.type = "time";
+        timeInput.value = allDay ? "09:00" : formatTime(startDate);
+        timeInput.disabled = allDay;
+        timeInput.setAttribute("aria-label", t("newTime"));
+      });
+    }
 
     new Setting(contentEl).setClass("bases-calendar-reschedule-actions")
       .addButton((button) =>
@@ -621,7 +730,7 @@ class RescheduleModal extends Modal {
           .setButtonText(t("save"))
           .setCta()
           .onClick(async () => {
-            const nextStart = parseLocalDate(dateInput.value, timeInput.value, selectedAllDay);
+            const nextStart = parseLocalDate(dateInput.value, timeInput?.value, selectedAllDay);
             if (!nextStart) {
               new Notice(t("invalidDate"));
               return;

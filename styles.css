@@ -545,3 +545,27 @@ body.is-phone .bases-calendar-reschedule-modal .bases-calendar-reschedule-action
   padding: 0 3px;
   line-height: 1.4;
 }
+.bases-calendar-source-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	padding: 0.4rem 0.6rem;
+}
+
+.bases-calendar-source-filter {
+	min-height: 40px;
+	padding: 0.2rem 0.65rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+}
+
+.bases-calendar-source-filter[aria-pressed="true"] {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.bases-calendar-event-role {
+	font-weight: 600;
+}
