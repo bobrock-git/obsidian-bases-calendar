@@ -428,7 +428,16 @@ class RescheduleModal extends Modal {
     } catch {
       // Keep the file name when this Base does not expose note.title.
     }
-    contentEl.createEl("h2", { text: title, cls: "bases-calendar-reschedule-title" });
+    const heading = contentEl.createEl("h2", { cls: "bases-calendar-reschedule-title" });
+    const iconName = typeof this.app.metadataCache.getFileCache(file)?.frontmatter?.icon === "string"
+      ? String(this.app.metadataCache.getFileCache(file)?.frontmatter?.icon).replace(/^lucide[-/:]+/, "").trim()
+      : "";
+    if (iconName) {
+      const icon = heading.createSpan({ cls: "bases-calendar-reschedule-entity-icon", attr: { "aria-hidden": "true" } });
+      setIcon(icon, iconName);
+      if (!icon.querySelector("svg")) icon.remove();
+    }
+    heading.createSpan({ text: title });
     contentEl.createEl("p", { text: "Zmień termin", cls: "bases-calendar-reschedule-subtitle" });
 
     let dateInput!: HTMLInputElement;
@@ -440,17 +449,29 @@ class RescheduleModal extends Modal {
       dateInput.value = formatDate(startDate);
       dateInput.setAttribute("aria-label", "Nowa data");
     });
+    const weekendNotice = contentEl.createDiv({
+      cls: "bases-calendar-weekend-notice",
+      attr: { role: "status", "aria-live": "polite" },
+    });
     const shortcuts = contentEl.createDiv({
       cls: "bases-calendar-date-shortcuts",
       attr: { role: "group", "aria-label": "Szybki wybór daty" },
     });
     const shortcutButtons: { day: string; button: HTMLButtonElement }[] = [];
-    const syncShortcutState = () => {
+    const syncDateState = () => {
       for (const { day, button } of shortcutButtons) {
         const selected = dateInput.value === day;
         button.setAttribute("aria-pressed", String(selected));
         button.toggleClass("is-selected", selected);
       }
+      const selectedDate = parseLocalDate(dateInput.value, undefined, true);
+      const weekday = selectedDate?.getDay();
+      const isWeekend = weekday === 0 || weekday === 6;
+      dateInput.toggleClass("is-weekend", isWeekend);
+      weekendNotice.hidden = !isWeekend;
+      weekendNotice.setText(isWeekend
+        ? `${weekday === 6 ? "Sobota" : "Niedziela"} — termin wypada w weekend`
+        : "");
     };
     for (const [label, days] of [
       ["Jutro", 1],
@@ -472,22 +493,23 @@ class RescheduleModal extends Modal {
           "aria-pressed": "false",
         },
       });
-      button.createSpan({ text: label });
+      const labelRow = button.createSpan({ cls: "bases-calendar-date-shortcut-label" });
+      labelRow.createSpan({ text: label });
+      const check = labelRow.createSpan({ cls: "bases-calendar-date-shortcut-check", attr: { "aria-hidden": "true" } });
+      setIcon(check, "check");
       button.createSpan({
         text: isWeekend ? `${weekdayLabel} ${dateLabel}` : dateLabel,
         cls: `bases-calendar-date-shortcut-value${isWeekend ? " is-weekend" : ""}`,
       });
-      const check = button.createSpan({ cls: "bases-calendar-date-shortcut-check" });
-      setIcon(check, "check");
       button.addEventListener("click", () => {
         dateInput.value = day;
         dateInput.dispatchEvent(new Event("change", { bubbles: true }));
       });
       shortcutButtons.push({ day, button });
     }
-    dateInput.addEventListener("input", syncShortcutState);
-    dateInput.addEventListener("change", syncShortcutState);
-    syncShortcutState();
+    dateInput.addEventListener("input", syncDateState);
+    dateInput.addEventListener("change", syncDateState);
+    syncDateState();
     new Setting(contentEl).setName("Cały dzień").addToggle((toggle) => {
       toggle.setValue(allDay).onChange((value) => {
         selectedAllDay = value;
