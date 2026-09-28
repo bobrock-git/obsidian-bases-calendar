@@ -621,6 +621,51 @@ body.is-phone .bases-calendar-container {
 	}
 }
 
+/* Phone filter popover: stays open while roles are toggled; closes on a tap
+   outside, Escape or a second tap on the filter icon. */
+.bases-calendar-source-popover {
+	position: fixed;
+	z-index: var(--layer-menu);
+	display: flex;
+	flex-direction: column;
+	min-width: 14rem;
+	max-width: 96vw;
+	max-height: 70vh;
+	overflow-y: auto;
+	padding: var(--size-2-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-primary);
+	box-shadow: var(--shadow-s);
+}
+
+.bases-calendar-source-popover-all {
+	align-self: flex-end;
+	margin-bottom: var(--size-2-2);
+}
+
+.bases-calendar-source-popover-row {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 44px;
+}
+
+.bases-calendar-source-popover-row label {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	gap: var(--size-4-2);
+	min-height: 44px;
+	touch-action: manipulation;
+}
+
+.bases-calendar-source-popover-row .clickable-icon {
+	min-height: 44px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
 .bases-calendar-source-badge:empty {
 	display: none;
 }

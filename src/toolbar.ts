@@ -45,3 +45,8 @@ export function sourceBadge(total: number, hidden: number): string {
 export function toggleSource(hidden: readonly string[], id: string): string[] {
   return hidden.includes(id) ? hidden.filter((item) => item !== id) : [...hidden, id];
 }
+
+/** "Only this" in the filter popover: hide every other role. */
+export function onlySource(allIds: readonly string[], id: string): string[] {
+  return allIds.filter((item) => item !== id);
+}

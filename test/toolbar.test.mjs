@@ -36,3 +36,9 @@ test("toggleSource hides and restores a role without mutating input", () => {
   assert.deepEqual(toggleSource(hidden, "event"), []);
   assert.deepEqual(hidden, ["event"]);
 });
+
+test("onlySource hides every role except the chosen one", async () => {
+  const { onlySource } = await import("../src/toolbar.ts");
+  assert.deepEqual(onlySource(["meeting", "event", "followup"], "event"), ["meeting", "followup"]);
+  assert.deepEqual(onlySource(["meeting"], "meeting"), []);
+});

@@ -18,7 +18,7 @@ import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
-import { CALENDAR_VIEWS, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
+import { CALENDAR_VIEWS, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
@@ -118,6 +118,74 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     threeDay: t("threeDay"), timeGridDay: t("dayView"),
   } as Record<string, string>)[view] ?? view;
 
+  const popoverRef = useRef<{ el: HTMLElement; close: () => void } | null>(null);
+
+  const closeSourcePopover = useCallback(() => popoverRef.current?.close(), []);
+
+  const toggleSourcePopover = (anchor: HTMLElement) => {
+    if (popoverRef.current) {
+      popoverRef.current.close();
+      return;
+    }
+    const pop = document.body.createDiv({ cls: "bases-calendar-source-popover" });
+    pop.setAttribute("role", "group");
+    pop.setAttribute("aria-label", t("filterEvents"));
+
+    const render = () => {
+      pop.empty();
+      const hidden = hiddenSourcesRef.current;
+      const ids = sourceLabelsRef.current.map(([id]) => id);
+      const showAll = pop.createEl("button", { cls: "bases-calendar-source-popover-all", text: t("showAll") });
+      showAll.disabled = hidden.length === 0;
+      showAll.onclick = () => apply([]);
+      for (const [id, label] of sourceLabelsRef.current) {
+        const row = pop.createDiv({ cls: "bases-calendar-source-popover-row" });
+        // Native label + checkbox: the browser tells a tap from a scroll.
+        const lab = row.createEl("label");
+        const box = lab.createEl("input", { type: "checkbox" });
+        box.checked = !hidden.includes(id);
+        box.onchange = () => apply(toggleSource(hiddenSourcesRef.current, id));
+        lab.createSpan({ text: label });
+        const only = row.createEl("button", { cls: "clickable-icon", text: t("onlyThis") });
+        only.onclick = () => apply(onlySource(ids, id));
+      }
+    };
+    const apply = (next: string[]) => {
+      hiddenSourcesRef.current = next;
+      setHiddenSources(next);
+      render();
+    };
+
+    const place = () => {
+      const rect = anchor.getBoundingClientRect();
+      pop.style.top = `${rect.bottom + 4}px`;
+      pop.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+    };
+    const onOutside = (evt: PointerEvent) => {
+      const target = evt.target as Node;
+      if (!pop.contains(target) && !anchor.contains(target)) close();
+    };
+    const onKey = (evt: KeyboardEvent) => { if (evt.key === "Escape") close(); };
+    const close = () => {
+      document.removeEventListener("pointerdown", onOutside, true);
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("resize", place);
+      pop.remove();
+      anchor.setAttribute("aria-expanded", "false");
+      popoverRef.current = null;
+    };
+
+    render();
+    place();
+    document.addEventListener("pointerdown", onOutside, true);
+    document.addEventListener("keydown", onKey, true);
+    window.addEventListener("resize", place);
+    anchor.setAttribute("aria-expanded", "true");
+    popoverRef.current = { el: pop, close };
+  };
+
+  useEffect(() => closeSourcePopover, [closeSourcePopover]);
+
   const customButtons = useMemo(
     () => ({
       zoomIn:  { text: "+", hint: t("zoomIn"),  click: () => handleZoom("in") },
@@ -140,22 +208,11 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
           showAtButton(menu, el);
         },
       },
-      // Phone only: source filter chips collapse into one checklist menu.
+      // Phone only: source filter chips collapse into a checklist popover that
+      // stays open, so several roles can be toggled in one go.
       sourceMenu: {
         text: "", hint: t("filterEvents"),
-        click: (_evt: MouseEvent, el: HTMLElement) => {
-          const menu = new Menu();
-          for (const [id, label] of sourceLabelsRef.current) {
-            menu.addItem((item) => item.setTitle(label)
-              .setChecked(!hiddenSourcesRef.current.includes(id))
-              .onClick(() => setHiddenSources((current) => toggleSource(current, id))));
-          }
-          if (hiddenSourcesRef.current.length > 0) {
-            menu.addSeparator();
-            menu.addItem((item) => item.setTitle(t("showAll")).setIcon("eye").onClick(() => setHiddenSources([])));
-          }
-          showAtButton(menu, el);
-        },
+        click: (_evt: MouseEvent, el: HTMLElement) => toggleSourcePopover(el),
       },
     }),
     [handleZoom],
