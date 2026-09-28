@@ -869,6 +869,12 @@ body.is-phone .bases-calendar-container {
 	height: 1.15em;
 }
 
+/* The title list is capped at 100% of the title; beside the icon it would
+   overflow and collapse to a bare ellipsis, so it gives the icon its room. */
+.bases-calendar-event-role-icon + .bases-calendar-prop-list {
+	max-width: calc(100% - 1.15em - var(--size-2-2));
+}
+
 .bases-calendar-source-icon {
 	margin-inline-end: var(--size-2-2);
 }
