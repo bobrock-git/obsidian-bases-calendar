@@ -878,3 +878,25 @@ body.is-phone .bases-calendar-container {
 .bases-calendar-source-icon {
 	margin-inline-end: var(--size-2-2);
 }
+
+/* A timed block is as tall as its duration, so in a short one the title sat
+   at the top with twice the space below it. Short blocks centre their content;
+   tall ones stay top-aligned like every calendar. The query measures the block
+   itself, so the rule follows zoom levels as well. */
+.bases-calendar-container .fc-timegrid-event .fc-event-main {
+	container-type: size;
+}
+
+@container (max-height: 44px) {
+	.bases-calendar-container .fc-timegrid-event .bases-calendar-event-content {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		height: 100%;
+		padding-block: 0;
+	}
+
+	.bases-calendar-container .fc-timegrid-event .bases-calendar-event-title:last-child {
+		margin-bottom: 0;
+	}
+}
