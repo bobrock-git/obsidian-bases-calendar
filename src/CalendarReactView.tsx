@@ -767,12 +767,17 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       events={events}
       eventContent={renderEventContent}
       eventClassNames={Platform.isPhone && moveMode ? ["bases-calendar-phone-moving"] : []}
+      // FullCalendar makes touch users hold an event for 1 s before it drags.
+      // In move mode the toggle already states the intent, so drag at once.
+      eventLongPressDelay={Platform.isPhone && moveMode ? 0 : 1000}
       eventDidMount={handleEventDidMount}
       eventWillUnmount={handleEventWillUnmount}
       eventClick={handleEventClick}
       eventMouseEnter={handleEventMouseEnter}
       eventDrop={(info) => {
-        void handleEventDrop(info).finally(() => setMoveMode(false));
+        // Move mode stays on until the toggle is tapped again: several blocks
+        // can be moved in a row, and the accent icon says the mode is live.
+        void handleEventDrop(info);
       }}
       eventResize={(info) => void handleEventResize(info)}
       viewDidMount={handleViewDidMount}

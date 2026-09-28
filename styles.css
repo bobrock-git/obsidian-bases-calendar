@@ -590,10 +590,22 @@ body.is-phone .bases-calendar-container {
 		text-overflow: ellipsis;
 	}
 
+	/* Flat toolbar: phone --button-radius is a pill (standard #403), which
+	   turns every toolbar control and its focus ring into an oval. */
 	.fc .fc-button {
 		min-width: 40px;
 		min-height: 40px;
+		border-radius: var(--radius-s) !important;
 		touch-action: manipulation;
+
+		&:focus {
+			box-shadow: none !important;
+		}
+
+		&:focus-visible {
+			box-shadow: 0 0 0 var(--input-border-width-focus)
+				var(--background-modifier-border-focus) !important;
+		}
 	}
 
 	.fc-rangeMenu-button,
@@ -628,10 +640,17 @@ body.is-phone .bases-calendar-container {
 		--icon-size: var(--icon-xs);
 	}
 
-	/* Move mode on: accent fill, so it is obvious a tap now drags, not opens. */
+	/* Move mode on: accent icon on a soft tile, so it is obvious a touch now drags, not opens. */
 	.fc-moveMode-button[aria-pressed="true"] {
-		background-color: var(--interactive-accent) !important;
-		color: var(--text-on-accent) !important;
+		background-color: var(--background-modifier-active-hover) !important;
+		color: var(--text-accent) !important;
+	}
+
+	/* The range reads as the heading it replaces, not as a button. */
+	.fc-rangeMenu-button,
+	.fc-rangeMenu-button:active {
+		background-color: transparent !important;
+		padding-inline: var(--size-2-2) !important;
 	}
 
 	.fc-sourceMenu-button.is-filtered {
