@@ -434,10 +434,11 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     };
     const showMenu = (evt: MouseEvent) => {
       evt.preventDefault();
+      if (Platform.isPhone) evt.stopImmediatePropagation();
       clearTimer();
       if (Platform.isPhone && moveModeRef.current) return;
       const previous = lastLongPressRef.current;
-      if (previous?.path === entry.file.path && Date.now() - previous.at < 500 && evt.isTrusted) return;
+      if (previous?.path === entry.file.path && Date.now() - previous.at < 1000 && evt.isTrusted) return;
       if (Platform.isPhone) {
         lastLongPressRef.current = { path: entry.file.path, at: Date.now() };
       }
@@ -456,12 +457,9 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       startX = evt.clientX;
       startY = evt.clientY;
       longPressTimer = setTimeout(() => {
-        el.dispatchEvent(new MouseEvent("contextmenu", {
-          bubbles: true,
-          cancelable: true,
-          clientX: startX,
-          clientY: startY,
-        }));
+        // Open the event's own menu without dispatching a bubbling contextmenu
+        // to links inside the event or the Obsidian/Bases view.
+        showMenu(evt);
       }, 600);
     };
     const onPointerMove = (evt: PointerEvent) => {
@@ -474,7 +472,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         evt.stopImmediatePropagation();
       }
     };
-    el.addEventListener("contextmenu", showMenu);
+    el.addEventListener("contextmenu", showMenu, true);
     el.addEventListener("click", onClickCapture, true);
     el.addEventListener("pointerdown", onPointerDown);
     el.addEventListener("pointermove", onPointerMove);
@@ -482,7 +480,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     el.addEventListener("pointercancel", clearTimer);
     eventListenersRef.current.set(el, () => {
       clearTimer();
-      el.removeEventListener("contextmenu", showMenu);
+      el.removeEventListener("contextmenu", showMenu, true);
       el.removeEventListener("click", onClickCapture, true);
       el.removeEventListener("pointerdown", onPointerDown);
       el.removeEventListener("pointermove", onPointerMove);

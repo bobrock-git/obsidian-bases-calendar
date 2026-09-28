@@ -64,6 +64,47 @@ body.is-phone .bases-calendar-three-day .fc-daygrid-event {
   min-height: 44px;
 }
 
+.bases-calendar-date-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.bases-calendar-date-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--radius-m);
+}
+
+.bases-calendar-date-shortcut-value {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+body.is-phone .bases-calendar-reschedule-modal .setting-item {
+  padding: 8px 0;
+}
+
+body.is-phone .bases-calendar-reschedule-modal .setting-item-control input,
+body.is-phone .bases-calendar-reschedule-modal .setting-item-control button,
+body.is-phone .bases-calendar-reschedule-modal .bases-calendar-date-shortcut {
+  border-radius: var(--radius-m);
+}
+
+body.is-phone .bases-calendar-reschedule-modal .setting-item-control input {
+  min-height: 44px;
+}
+
+body.is-phone .bases-calendar-reschedule-modal .bases-calendar-reschedule-actions {
+  margin-top: 8px;
+}
+
 /* Embedded in a markdown note: parent has no intrinsic height, so use the
    CSS variable (default 600px) to give the container a defined size. */
 .markdown-rendered .bases-calendar-container {
