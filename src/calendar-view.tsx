@@ -509,10 +509,10 @@ export class CalendarView extends BasesView {
         type: "group",
         items: [
           {
-            displayName: "Date sources (JSON or YAML list in .base)",
+            displayName: t("dateSources"),
             type: "text",
             key: "dateSources",
-            placeholder: "Advanced: multiple dated roles per note",
+            placeholder: t("dateSourcesHint"),
           },
           {
             displayName: t("startDate"),

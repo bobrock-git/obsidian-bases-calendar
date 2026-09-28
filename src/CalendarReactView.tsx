@@ -528,7 +528,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   return (
     <div className={`bases-calendar-react-shell${Platform.isPhone && activeView === "threeDay" ? " bases-calendar-three-day" : ""}`}>
       {sourceLabels.length > 1 && (
-        <div className="bases-calendar-source-filters" role="group" aria-label={t("calendar")}>
+        <div className="bases-calendar-source-filters" role="group" aria-label={t("filterEvents")}>
           {sourceLabels.map(([id, label]) => (
             <button key={id} type="button" aria-pressed={!hiddenSources.includes(id)}
               className="bases-calendar-source-filter"
