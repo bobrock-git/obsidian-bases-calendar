@@ -900,3 +900,12 @@ body.is-phone .bases-calendar-container {
 		margin-bottom: 0;
 	}
 }
+
+/* Reset of the role filter: same shape as the chips, set apart by the gap and
+   a muted label, since it undoes filters rather than being one. */
+.bases-calendar-source-reset {
+	flex: 0 0 auto;
+	white-space: nowrap;
+	margin-inline-start: var(--size-4-2);
+	color: var(--text-muted);
+}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { moveToggle, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "../src/toolbar.ts";
+import { filterStorageKey, moveToggle, onlySource, parseHiddenSources, phoneTitleFormat, soloSource, sourceBadge, toggleSource, toolbarLayout } from "../src/toolbar.ts";
 
 test("desktop keeps the full toolbar with every view button", () => {
   const layout = toolbarLayout();
@@ -47,4 +47,30 @@ test("live label shows the span and the minutes written to duration_min", async 
   assert.equal(liveTimeLabel(new Date(2026, 8, 29, 9, 0), new Date(2026, 8, 29, 10, 30)), "09:00–10:30 · 90 min");
   assert.equal(liveTimeLabel(new Date(2026, 8, 29, 23, 30), new Date(2026, 8, 30, 0, 15)), "23:30–00:15 · 45 min");
   assert.equal(liveTimeLabel(new Date(2026, 8, 29, 7, 5), null), "07:05");
+});
+
+const ROLES = ["meeting", "followup", "deal-close"];
+
+test("only this isolates a role and a second time brings every role back", () => {
+  assert.deepEqual(soloSource(ROLES, [], "followup"), ["meeting", "deal-close"]);
+  assert.deepEqual(soloSource(ROLES, ["meeting", "deal-close"], "followup"), []);
+});
+
+test("only this on another role moves the isolation instead of resetting", () => {
+  assert.deepEqual(soloSource(ROLES, ["meeting", "deal-close"], "meeting"), ["followup", "deal-close"]);
+  assert.deepEqual(soloSource(ROLES, ["meeting"], "followup"), ["meeting", "deal-close"]);
+});
+
+test("the storage key ignores role order and needs roles", () => {
+  assert.equal(filterStorageKey(["meeting", "followup"]), filterStorageKey(["followup", "meeting"]));
+  assert.notEqual(filterStorageKey(["meeting"]), filterStorageKey(["meeting", "followup"]));
+  assert.equal(filterStorageKey([]), null);
+});
+
+test("a damaged stored filter falls back to showing everything", () => {
+  assert.deepEqual(parseHiddenSources(JSON.stringify(["followup"])), ["followup"]);
+  assert.deepEqual(parseHiddenSources(null), []);
+  assert.deepEqual(parseHiddenSources("not json"), []);
+  assert.deepEqual(parseHiddenSources(JSON.stringify({ followup: true })), []);
+  assert.deepEqual(parseHiddenSources(JSON.stringify(["followup", 3, null])), ["followup"]);
 });

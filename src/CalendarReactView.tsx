@@ -21,7 +21,7 @@ import { toIsoDay } from "./view-state";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
 import { entryClassNames } from "./entry-style";
-import { CALENDAR_VIEWS, liveTimeLabel, moveToggle, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
+import { CALENDAR_VIEWS, liveTimeLabel, moveToggle, parseHiddenSources, phoneTitleFormat, soloSource, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
 
 const LucideIcon = ({ name, className }: { name: string; className?: string }) => {
   const ref = useRef<HTMLSpanElement>(null);
@@ -45,6 +45,7 @@ interface CalendarReactViewProps {
   initialView: string;
   /** First visible day to open on (`YYYY-MM-DD`); today when absent. */
   initialDate?: string;
+  filterStorageKey: string | null;
   initialSlotDuration: string;
   scrollToTime: string;
   detailProperty: BasesPropertyId | null;
@@ -75,6 +76,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   weekStartDay,
   initialView,
   initialDate,
+  filterStorageKey,
   initialSlotDuration,
   scrollToTime,
   detailProperty,
@@ -104,7 +106,41 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   activeViewRef.current = activeView;
   const [rangeTitle, setRangeTitle] = useState("");
   const lastLongPressRef = useRef<{ id: string; at: number } | null>(null);
-  const [hiddenSources, setHiddenSources] = useState<string[]>([]);
+  // Hidden roles survive closing the calendar on this device. Storage can be
+  // blocked (private mode, WebView settings); the filter then just starts full.
+  const readHidden = (key: string | null): string[] => {
+    if (!key) return [];
+    try {
+      return parseHiddenSources(window.localStorage.getItem(key));
+    } catch {
+      return [];
+    }
+  };
+  const [hiddenSources, setHiddenSources] = useState<string[]>(() => readHidden(filterStorageKey));
+  const storedKeyRef = useRef(filterStorageKey);
+  const skipSaveRef = useRef(false);
+  useEffect(() => {
+    // A changed role set is another filter: load its own choice. The save
+    // effect below runs in the same commit with the old state, so it skips
+    // once instead of writing the old choice under the new key.
+    if (storedKeyRef.current === filterStorageKey) return;
+    storedKeyRef.current = filterStorageKey;
+    skipSaveRef.current = true;
+    setHiddenSources(readHidden(filterStorageKey));
+  }, [filterStorageKey]);
+  useEffect(() => {
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false;
+      return;
+    }
+    if (!filterStorageKey) return;
+    try {
+      if (hiddenSources.length) window.localStorage.setItem(filterStorageKey, JSON.stringify(hiddenSources));
+      else window.localStorage.removeItem(filterStorageKey);
+    } catch {
+      // Not remembered this time; the calendar itself still filters.
+    }
+  }, [filterStorageKey, hiddenSources]);
   const eventListenersRef = useRef(new WeakMap<HTMLElement, () => void>());
   const [slotDuration, setSlotDuration] = useState(initialSlotDuration);
   const slotDurationRef = useRef(initialSlotDuration);
@@ -174,7 +210,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         }
         lab.createSpan({ text: label });
         const only = row.createEl("button", { cls: "clickable-icon", text: t("onlyThis") });
-        only.onclick = () => apply(onlySource(ids, id));
+        only.onclick = () => apply(soloSource(ids, hiddenSourcesRef.current, id));
       }
     };
     const apply = (next: string[]) => {
@@ -293,6 +329,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     .filter((item) => item.source)
     .map((item) => [item.source!.id, item.source!.label])).entries());
   sourceLabelsRef.current = sourceLabels;
+  const sourceIds = sourceLabels.map(([id]) => id);
   // The filter shows the same role icon as the block, so it doubles as a legend.
   const sourceIcons = new Map(entries
     .filter((item) => item.source?.icon)
@@ -728,12 +765,34 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         <div className="bases-calendar-source-filters" role="group" aria-label={t("filterEvents")}>
           {sourceLabels.map(([id, label]) => (
             <button key={id} type="button" aria-pressed={!hiddenSources.includes(id)}
-              className="bases-calendar-source-filter"
-              onClick={() => setHiddenSources((current) => toggleSource(current, id))}>
+              className="bases-calendar-source-filter" title={t("filterHint")}
+              onClick={(evt) => {
+                // Ctrl/Cmd+click isolates the role, the same "only this" the
+                // phone popover offers; a plain click keeps toggling one role.
+                if (evt.ctrlKey || evt.metaKey) setHiddenSources((current) => soloSource(sourceIds, current, id));
+                else setHiddenSources((current) => toggleSource(current, id));
+              }}
+              onContextMenu={(evt) => {
+                evt.preventDefault();
+                const menu = new Menu();
+                menu.addItem((item) => item.setTitle(t("onlyThis")).setIcon("filter")
+                  .onClick(() => setHiddenSources((current) => soloSource(sourceIds, current, id))));
+                menu.addItem((item) => item.setTitle(t("showAll")).setIcon("list-restart")
+                  .setDisabled(hiddenSources.length === 0).onClick(() => setHiddenSources([])));
+                menu.showAtMouseEvent(evt.nativeEvent);
+              }}>
               {sourceIcons.has(id) && <LucideIcon name={sourceIcons.get(id)!} className="bases-calendar-source-icon" />}
               {label}
             </button>
           ))}
+          {hiddenSources.length > 0 && (
+            // Shown only while something is hidden, with the same visible/total
+            // count as the phone filter badge, so the reset says what it undoes.
+            <button type="button" className="bases-calendar-source-reset" onClick={() => setHiddenSources([])}>
+              <LucideIcon name="list-restart" className="bases-calendar-source-icon" />
+              {`${t("showAll")} (${badge})`}
+            </button>
+          )}
         </div>
       )}
       {phone && (

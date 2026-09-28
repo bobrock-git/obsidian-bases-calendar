@@ -24,6 +24,7 @@ import { locale, t } from "./i18n";
 import { DateSource, matchesDateSource, parseDateSources, sourceEventId } from "./date-sources";
 import { entryAccent, isOverdue } from "./entry-style";
 import { isPhoneLayout } from "./platform";
+import { filterStorageKey } from "./toolbar";
 
 export const CalendarViewType = "calendar";
 
@@ -218,6 +219,7 @@ export class CalendarView extends BasesView {
             scrollToTime={this.scrollToTime}
             detailProperty={this.detailProp}
             properties={this.config.getOrder() || []}
+            filterStorageKey={filterStorageKey(this.dateSources.map((source) => source.id))}
             onViewChange={(view) => { this.currentView = view; }}
             onDateChange={(date) => { this.currentDate = date; }}
             onZoomChange={(dur) => { this.slotDuration = dur; }}

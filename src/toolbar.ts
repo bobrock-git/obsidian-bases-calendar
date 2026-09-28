@@ -53,6 +53,30 @@ export function onlySource(allIds: readonly string[], id: string): string[] {
   return allIds.filter((item) => item !== id);
 }
 
+// "Only this" a second time on the role that is already alone brings every
+// role back, so the same gesture isolates and undoes the isolation.
+export function soloSource(allIds: readonly string[], hidden: readonly string[], id: string): string[] {
+  const alone = !hidden.includes(id) && allIds.every((item) => item === id || hidden.includes(item));
+  return alone ? [] : onlySource(allIds, id);
+}
+
+// Hidden roles are remembered per device and per set of roles, so every
+// embed of the same calendar shares one choice and reordering the roles in
+// the Base does not lose it.
+export function filterStorageKey(sourceIds: readonly string[]): string | null {
+  return sourceIds.length ? `bases-calendar-hidden-sources:${[...sourceIds].sort().join(",")}` : null;
+}
+
+export function parseHiddenSources(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Live label on a block while it is dragged or resized: "09:00–10:30 · 90 min". */
 export function liveTimeLabel(start: Date, end: Date | null): string {
   const hm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
