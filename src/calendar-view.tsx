@@ -21,6 +21,7 @@ import { AppContext } from "./context";
 import { resolveColor } from "./colors";
 import { locale, t } from "./i18n";
 import { DateSource, matchesDateSource, parseDateSources, sourceEventId } from "./date-sources";
+import { entryAccent, isOverdue } from "./entry-style";
 import { isPhoneLayout } from "./platform";
 
 export const CalendarViewType = "calendar";
@@ -33,8 +34,8 @@ export interface CalendarEntry {
   endDate?: Date;
   durationMinutes?: number;
   allDay: boolean;
-  backgroundColor?: string;
-  borderColor?: string;
+  accentColor?: string;
+  overdue: boolean;
 }
 
 export class CalendarView extends BasesView {
@@ -170,13 +171,18 @@ export class CalendarView extends BasesView {
     if (!result) return null;
     const endDate = endProperty ? this.extractDate(entry, endProperty)?.date : undefined;
     const durationMinutes = durationProperty ? this.extractDuration(entry, durationProperty) : undefined;
-    let colorProps: Pick<CalendarEntry, "backgroundColor" | "borderColor"> = {};
+    let explicitColor: string | undefined;
     try {
       const color = this.colorProp ? entry.getValue(this.colorProp)?.toString() : source?.color;
-      const resolved = resolveColor(color || source?.color);
-      if (resolved) colorProps = resolved;
+      explicitColor = resolveColor(color || source?.color)?.borderColor;
     } catch {
       // An invalid color does not hide a dated entry.
+    }
+    let type = "";
+    try {
+      type = entry.getValue("note.type")?.toString() ?? "";
+    } catch {
+      // A Base without note.type keeps the neutral block.
     }
     return {
       id: source ? sourceEventId(entry.file.path, source.id) : entry.file.path,
@@ -186,7 +192,8 @@ export class CalendarView extends BasesView {
       endDate,
       durationMinutes,
       allDay: source ? !source.allowTime || !result.hasTimed : !result.hasTimed,
-      ...colorProps,
+      accentColor: entryAccent(type, explicitColor) ?? undefined,
+      overdue: source?.markOverdue === true && isOverdue(result.date, endDate, new Date()),
     };
   }
 

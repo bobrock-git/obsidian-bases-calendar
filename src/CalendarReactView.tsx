@@ -19,6 +19,7 @@ import { useApp } from "./hooks";
 import { isPhoneLayout } from "./platform";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
+import { entryClassNames } from "./entry-style";
 import { CALENDAR_VIEWS, liveTimeLabel, moveToggle, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
 
 const LucideIcon = ({ name, className }: { name: string; className?: string }) => {
@@ -118,6 +119,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
 
   const shellRef = useRef<HTMLDivElement>(null);
   const sourceLabelsRef = useRef<[string, string][]>([]);
+  const sourceIconsRef = useRef<Map<string, string>>(new Map());
   const hiddenSourcesRef = useRef<string[]>([]);
 
   const showAtButton = (menu: Menu, el: HTMLElement) => {
@@ -157,6 +159,11 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         const box = lab.createEl("input", { type: "checkbox" });
         box.checked = !hidden.includes(id);
         box.onchange = () => apply(toggleSource(hiddenSourcesRef.current, id));
+        const iconName = sourceIconsRef.current.get(id);
+        if (iconName) {
+          const icon = lab.createSpan({ cls: "bases-calendar-icon bases-calendar-source-icon", attr: { "aria-hidden": "true" } });
+          setIcon(icon, iconName);
+        }
         lab.createSpan({ text: label });
         const only = row.createEl("button", { cls: "clickable-icon", text: t("onlyThis") });
         only.onclick = () => apply(onlySource(ids, id));
@@ -272,6 +279,11 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     .filter((item) => item.source)
     .map((item) => [item.source!.id, item.source!.label])).entries());
   sourceLabelsRef.current = sourceLabels;
+  // The filter shows the same role icon as the block, so it doubles as a legend.
+  const sourceIcons = new Map(entries
+    .filter((item) => item.source?.icon)
+    .map((item) => [item.source!.id, item.source!.icon!]));
+  sourceIconsRef.current = sourceIcons;
   hiddenSourcesRef.current = hiddenSources;
   const toolbar = toolbarLayout();
 
@@ -319,8 +331,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       durationEditable: calEntry.allDay
         ? canResizeAllDayEntry(calEntry)
         : canResizeEntry(calEntry),
-      backgroundColor: calEntry.backgroundColor,
-      borderColor: calEntry.borderColor,
+      classNames: entryClassNames(calEntry.accentColor ?? null, calEntry.overdue),
       extendedProps: {
         entry: calEntry.entry,
         calendarEntry: calEntry,
@@ -586,7 +597,13 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
           {liveLabel && <div className="bases-calendar-live-time">{liveLabel}</div>}
           <div className="bases-calendar-event-details">
             <div className="bases-calendar-event-title">
-              {calendarEntry.source && <span className="bases-calendar-event-role">{calendarEntry.source.label}: </span>}
+              {calendarEntry.source?.icon
+                // The icon replaces the "Follow-up: " prefix, which took most of
+                // a phone column; the label stays for screen readers and hover.
+                ? <span className="bases-calendar-event-role-icon" role="img" aria-label={calendarEntry.source.label}>
+                    <LucideIcon name={calendarEntry.source.icon} />
+                  </span>
+                : calendarEntry.source && <span className="bases-calendar-event-role">{calendarEntry.source.label}: </span>}
               {titleProp
                 ? <ListPropertyValue value={titleProp.value} maxItems={1} />
                 : entry.file.basename}
@@ -615,6 +632,10 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   const handleEventDidMount = useCallback((info: EventMountArg) => {
     const el = info.el;
     const entry = info.event.extendedProps.entry as BasesEntry;
+    // FullCalendar's colour props would set border-color, which the base rule
+    // hides; the stripe and tint read this variable instead.
+    const accent = (info.event.extendedProps.calendarEntry as CalendarEntry).accentColor;
+    if (accent) el.style.setProperty("--bases-calendar-accent", accent);
     let longPressTimer: ReturnType<typeof setTimeout> | null = null;
     let startX = 0;
     let startY = 0;
@@ -695,6 +716,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
             <button key={id} type="button" aria-pressed={!hiddenSources.includes(id)}
               className="bases-calendar-source-filter"
               onClick={() => setHiddenSources((current) => toggleSource(current, id))}>
+              {sourceIcons.has(id) && <LucideIcon name={sourceIcons.get(id)!} className="bases-calendar-source-icon" />}
               {label}
             </button>
           ))}
