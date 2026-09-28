@@ -18,7 +18,7 @@ import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
-import { CALENDAR_VIEWS, onlySource, phoneTitleFormat, viewShortLabelKey, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
+import { CALENDAR_VIEWS, moveToggle, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
@@ -82,6 +82,11 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   const [moveMode, setMoveMode] = useState(false);
   const moveModeRef = useRef(moveMode);
   moveModeRef.current = moveMode;
+  const activeViewRef = useRef(activeView);
+  activeViewRef.current = activeView;
+  // Set when the move toggle switched to 3 days; viewDidMount then keeps moving on.
+  const pendingMoveRef = useRef(false);
+  const [rangeTitle, setRangeTitle] = useState("");
   const lastLongPressRef = useRef<{ id: string; at: number } | null>(null);
   const [hiddenSources, setHiddenSources] = useState<string[]>([]);
   const eventListenersRef = useRef(new WeakMap<HTMLElement, () => void>());
@@ -186,12 +191,35 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
 
   useEffect(() => closeSourcePopover, [closeSourcePopover]);
 
+  // Native date picker for "Go to date": the system calendar, no typing.
+  const pickDate = (anchor: HTMLElement, onPick: (date: Date) => void) => {
+    const input = document.body.createEl("input", { type: "date", cls: "bases-calendar-date-jump" });
+    const rect = anchor.getBoundingClientRect();
+    input.style.top = `${rect.bottom}px`;
+    input.style.left = `${rect.left}px`;
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    input.value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    const done = () => input.remove();
+    input.onchange = () => {
+      if (input.value) onPick(new Date(`${input.value}T00:00:00`));
+      done();
+    };
+    input.onblur = () => window.setTimeout(done, 300);
+    input.focus();
+    try {
+      input.showPicker();
+    } catch {
+      input.click();
+    }
+  };
+
   const customButtons = useMemo(
     () => ({
       zoomIn:  { text: "+", hint: t("zoomIn"),  click: () => handleZoom("in") },
       zoomOut: { text: "−", hint: t("zoomOut"), click: () => handleZoom("out") },
-      // Phone only: the view switcher and zoom collapse into one icon menu.
-      viewMenu: {
+      // Phone only: the date range is the view selector ("28 wrz – 2 paź ▾").
+      rangeMenu: {
         text: "", hint: t("viewMenu"),
         click: (_evt: MouseEvent, el: HTMLElement) => {
           const api = calendarRef.current?.getApi();
@@ -203,9 +231,25 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
               .onClick(() => api.changeView(view)));
           }
           menu.addSeparator();
+          menu.addItem((item) => item.setTitle(t("goToDate")).setIcon("calendar-search")
+            .onClick(() => pickDate(el, (date) => api.gotoDate(date))));
+          menu.addSeparator();
           menu.addItem((item) => item.setTitle(t("zoomIn")).setIcon("zoom-in").onClick(() => handleZoom("in")));
           menu.addItem((item) => item.setTitle(t("zoomOut")).setIcon("zoom-out").onClick(() => handleZoom("out")));
           showAtButton(menu, el);
+        },
+      },
+      // Phone only: "move events" toggle; outside 3 days it switches there first.
+      moveMode: {
+        text: "", hint: t("move"),
+        click: () => {
+          const next = moveToggle(activeViewRef.current, moveModeRef.current);
+          if (next.changeView) {
+            pendingMoveRef.current = true;
+            calendarRef.current?.getApi().changeView(next.changeView);
+          } else {
+            setMoveMode(next.moveMode);
+          }
         },
       },
       // Phone only: source filter chips collapse into a checklist popover that
@@ -236,25 +280,27 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     .map((item) => [item.source!.id, item.source!.label])).entries());
   sourceLabelsRef.current = sourceLabels;
   hiddenSourcesRef.current = hiddenSources;
-  const toolbar = toolbarLayout(Platform.isPhone, sourceLabels.length > 1);
+  const toolbar = toolbarLayout(Platform.isPhone, sourceLabels.length > 1, editable);
 
   // FullCalendar renders custom buttons as plain text; give the phone menus
   // Obsidian icons and keep the filter badge in sync with the hidden roles.
   useEffect(() => {
     const shell = shellRef.current;
     if (!shell) return;
-    const viewButton = shell.querySelector<HTMLElement>(".fc-viewMenu-button");
-    if (viewButton) {
-      // Show the active view like a select shows its value: "3 dni ▾".
-      const label = t(viewShortLabelKey(activeView));
-      if (viewButton.dataset.view !== activeView || !viewButton.querySelector(".bases-calendar-view-label")) {
-        viewButton.empty();
-        viewButton.createSpan({ cls: "bases-calendar-view-label", text: label });
-        const chevron = viewButton.createSpan({ cls: "bases-calendar-view-chevron" });
-        setIcon(chevron, "chevron-down");
-        viewButton.dataset.view = activeView;
-        viewButton.setAttribute("aria-label", `${t("viewMenu")}: ${label}`);
-      }
+    const rangeButton = shell.querySelector<HTMLElement>(".fc-rangeMenu-button");
+    if (rangeButton && (rangeButton.dataset.title !== rangeTitle || !rangeButton.querySelector(".bases-calendar-range-label"))) {
+      rangeButton.empty();
+      rangeButton.createSpan({ cls: "bases-calendar-range-label", text: rangeTitle });
+      setIcon(rangeButton.createSpan({ cls: "bases-calendar-range-chevron" }), "chevron-down");
+      rangeButton.dataset.title = rangeTitle;
+      rangeButton.setAttribute("aria-label", `${t("viewMenu")}: ${rangeTitle}`);
+    }
+    const moveButton = shell.querySelector<HTMLElement>(".fc-moveMode-button");
+    if (moveButton) {
+      if (!moveButton.querySelector("svg")) setIcon(moveButton, "move");
+      moveButton.setAttribute("aria-pressed", String(moveMode));
+      moveButton.setAttribute("aria-label", moveMode ? t("stopMove") : t("move"));
+      moveButton.setAttribute("title", moveMode ? t("stopMove") : t("move"));
     }
     const sourceButton = shell.querySelector<HTMLElement>(".fc-sourceMenu-button");
     if (sourceButton) {
@@ -587,7 +633,8 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   const handleViewDidMount = useCallback(
     (arg: ViewMountArg) => {
       setActiveView(arg.view.type);
-      setMoveMode(false);
+      setMoveMode(pendingMoveRef.current && arg.view.type === "threeDay");
+      pendingMoveRef.current = false;
       onViewChange(arg.view.type);
     },
     [onViewChange],
@@ -681,16 +728,6 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
           ))}
         </div>
       )}
-      {Platform.isPhone && editable && activeView === "threeDay" && (
-        <button
-          type="button"
-          className="bases-calendar-move-mode-button"
-          aria-pressed={moveMode}
-          onClick={() => setMoveMode((current) => !current)}
-        >
-          {moveMode ? t("stopMove") : t("move")}
-        </button>
-      )}
     <FullCalendar
       ref={calendarRef}
       plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -739,6 +776,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       }}
       eventResize={(info) => void handleEventResize(info)}
       viewDidMount={handleViewDidMount}
+      datesSet={(arg) => setRangeTitle(arg.view.title)}
       height="100%"
       fixedWeekCount={false}
       fixedMirrorParent={document.body ?? undefined}

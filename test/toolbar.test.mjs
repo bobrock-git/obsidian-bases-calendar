@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "../src/toolbar.ts";
+import { moveToggle, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "../src/toolbar.ts";
 
 test("desktop keeps the full toolbar with every view button", () => {
   const layout = toolbarLayout(false, true);
@@ -10,18 +10,29 @@ test("desktop keeps the full toolbar with every view button", () => {
   assert.doesNotMatch(layout.right, /Menu/);
 });
 
-test("phone fits one row: navigation, title, icon menus", () => {
-  assert.deepEqual(toolbarLayout(true, true),
-    { left: "prev,today,next", center: "title", right: "viewMenu,sourceMenu" });
+test("phone fits one row: navigation, range selector, icon toggles", () => {
+  assert.deepEqual(toolbarLayout(true, true, true),
+    { left: "prev,today,next", center: "rangeMenu", right: "moveMode,sourceMenu" });
 });
 
-test("phone without date roles has no filter menu", () => {
-  assert.equal(toolbarLayout(true, false).right, "viewMenu");
+test("phone drops the icons it cannot use", () => {
+  assert.equal(toolbarLayout(true, false, true).right, "moveMode");
+  assert.equal(toolbarLayout(true, true, false).right, "sourceMenu");
+  assert.equal(toolbarLayout(true, false, false).right, "");
 });
 
-test("phone title drops the year except in month view", () => {
+test("phone title format hints at the view", () => {
+  assert.deepEqual(phoneTitleFormat("dayGridMonth"), { month: "long", year: "numeric" });
   assert.deepEqual(phoneTitleFormat("timeGridWeek"), { month: "short", day: "numeric" });
-  assert.deepEqual(phoneTitleFormat("dayGridMonth"), { month: "short", year: "numeric" });
+  assert.deepEqual(phoneTitleFormat("threeDay"), { month: "short", day: "numeric" });
+  assert.deepEqual(phoneTitleFormat("timeGridDay"), { weekday: "short", month: "short", day: "numeric" });
+});
+
+test("move toggle switches to 3 days instead of hiding", () => {
+  assert.deepEqual(moveToggle("threeDay", false), { moveMode: true });
+  assert.deepEqual(moveToggle("timeGridWeek", false), { changeView: "threeDay", moveMode: true });
+  assert.deepEqual(moveToggle("dayGridMonth", false), { changeView: "threeDay", moveMode: true });
+  assert.deepEqual(moveToggle("threeDay", true), { moveMode: false });
 });
 
 test("filter badge only appears when something is hidden", () => {
@@ -41,13 +52,4 @@ test("onlySource hides every role except the chosen one", async () => {
   const { onlySource } = await import("../src/toolbar.ts");
   assert.deepEqual(onlySource(["meeting", "event", "followup"], "event"), ["meeting", "followup"]);
   assert.deepEqual(onlySource(["meeting"], "meeting"), []);
-});
-
-test("phone view button label follows the active view", async () => {
-  const { viewShortLabelKey } = await import("../src/toolbar.ts");
-  assert.equal(viewShortLabelKey("dayGridMonth"), "shortMonth");
-  assert.equal(viewShortLabelKey("timeGridWeek"), "shortWeek");
-  assert.equal(viewShortLabelKey("workWeek"), "shortWorkWeek");
-  assert.equal(viewShortLabelKey("threeDay"), "threeDay");
-  assert.equal(viewShortLabelKey("timeGridDay"), "dayView");
 });

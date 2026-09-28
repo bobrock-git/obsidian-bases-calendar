@@ -35,18 +35,6 @@ body {
   min-height: 0;
 }
 
-body.is-phone .bases-calendar-move-mode-button {
-  align-self: flex-end;
-  min-height: 44px;
-  margin: 0 4px 4px;
-  padding: 0 12px;
-}
-
-body.is-phone .bases-calendar-move-mode-button[aria-pressed="true"] {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
 body.is-phone .bases-calendar-phone-moving {
   cursor: grab;
   touch-action: none;
@@ -608,7 +596,8 @@ body.is-phone .bases-calendar-container {
 		touch-action: manipulation;
 	}
 
-	.fc-viewMenu-button,
+	.fc-rangeMenu-button,
+	.fc-moveMode-button,
 	.fc-sourceMenu-button {
 		display: inline-flex;
 		align-items: center;
@@ -616,15 +605,33 @@ body.is-phone .bases-calendar-container {
 		gap: var(--size-2-1);
 	}
 
-	.fc-viewMenu-button {
-		white-space: nowrap;
+	/* The range title is the view selector: reads like a select with its value. */
+	.fc-rangeMenu-button {
+		max-width: 100%;
+		min-width: 0;
 		color: var(--text-normal) !important;
+		font-size: var(--font-ui-medium) !important;
+		font-weight: 600 !important;
 	}
 
-	.bases-calendar-view-chevron {
+	.bases-calendar-range-label {
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	.bases-calendar-range-chevron {
 		display: inline-flex;
+		flex-shrink: 0;
 		color: var(--text-muted);
 		--icon-size: var(--icon-xs);
+	}
+
+	/* Move mode on: accent fill, so it is obvious a tap now drags, not opens. */
+	.fc-moveMode-button[aria-pressed="true"] {
+		background-color: var(--interactive-accent) !important;
+		color: var(--text-on-accent) !important;
 	}
 
 	.fc-sourceMenu-button.is-filtered {
@@ -675,6 +682,15 @@ body.is-phone .bases-calendar-container {
 	min-height: 44px;
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
+}
+
+/* Hidden anchor for the native date picker behind "Go to date". */
+.bases-calendar-date-jump {
+	position: fixed;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	pointer-events: none;
 }
 
 .bases-calendar-source-badge:empty {

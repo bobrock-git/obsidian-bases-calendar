@@ -14,7 +14,7 @@ export interface ToolbarLayout {
  * navigation on the left, the title in the middle and two icon menus on the
  * right (view + zoom, source filter), so the time grid gets the height back.
  */
-export function toolbarLayout(isPhone: boolean, hasSources: boolean): ToolbarLayout {
+export function toolbarLayout(isPhone: boolean, hasSources: boolean, canMove = false): ToolbarLayout {
   if (!isPhone) {
     return {
       left: "title",
@@ -22,18 +22,26 @@ export function toolbarLayout(isPhone: boolean, hasSources: boolean): ToolbarLay
       right: `${CALENDAR_VIEWS.join(",")} prev,today,next zoomOut,zoomIn`,
     };
   }
-  return {
-    left: "prev,today,next",
-    center: "title",
-    right: hasSources ? "viewMenu,sourceMenu" : "viewMenu",
-  };
+  // The date range itself is the view selector ("28 wrz – 2 paź ▾").
+  const right = [canMove ? "moveMode" : "", hasSources ? "sourceMenu" : ""].filter(Boolean).join(",");
+  return { left: "prev,today,next", center: "rangeMenu", right };
 }
 
-/** Short title on a phone: "28 wrz – 2 paź" instead of the full range with year. */
+/**
+ * Phone "move events" toggle. Moving is only offered in the 3-day view (week
+ * blocks are too narrow for a finger), so switching it on elsewhere first
+ * switches to 3 days instead of hiding or disabling the button.
+ */
+export function moveToggle(activeView: string, moveMode: boolean): { changeView?: "threeDay"; moveMode: boolean } {
+  if (moveMode) return { moveMode: false };
+  return activeView === "threeDay" ? { moveMode: true } : { changeView: "threeDay", moveMode: true };
+}
+
+/** Short title on a phone: "wrzesień 2026", "28 wrz – 2 paź", "pon., 28 wrz". The format hints at the view. */
 export function phoneTitleFormat(view: string): Record<string, string> {
-  return view === "dayGridMonth"
-    ? { month: "short", year: "numeric" }
-    : { month: "short", day: "numeric" };
+  if (view === "dayGridMonth") return { month: "long", year: "numeric" };
+  if (view === "timeGridDay") return { weekday: "short", month: "short", day: "numeric" };
+  return { month: "short", day: "numeric" };
 }
 
 /** Badge for the phone filter button, e.g. "5/7"; empty when everything is visible. */
@@ -49,15 +57,4 @@ export function toggleSource(hidden: readonly string[], id: string): string[] {
 /** "Only this" in the filter popover: hide every other role. */
 export function onlySource(allIds: readonly string[], id: string): string[] {
   return allIds.filter((item) => item !== id);
-}
-
-/** Translation key of the short label the phone view button shows ("3 dni ▾"). */
-export function viewShortLabelKey(view: string): "shortMonth" | "shortWeek" | "shortWorkWeek" | "threeDay" | "dayView" {
-  switch (view) {
-    case "dayGridMonth": return "shortMonth";
-    case "timeGridWeek": return "shortWeek";
-    case "workWeek": return "shortWorkWeek";
-    case "threeDay": return "threeDay";
-    default: return "dayView";
-  }
 }
