@@ -616,6 +616,17 @@ body.is-phone .bases-calendar-container {
 		gap: var(--size-2-1);
 	}
 
+	.fc-viewMenu-button {
+		white-space: nowrap;
+		color: var(--text-normal) !important;
+	}
+
+	.bases-calendar-view-chevron {
+		display: inline-flex;
+		color: var(--text-muted);
+		--icon-size: var(--icon-xs);
+	}
+
 	.fc-sourceMenu-button.is-filtered {
 		color: var(--text-accent) !important;
 	}

@@ -18,7 +18,7 @@ import { CalendarEntry } from "./calendar-view";
 import { useApp } from "./hooks";
 import { language, locale, t } from "./i18n";
 import { inclusiveAllDayEnd } from "./all-day-end";
-import { CALENDAR_VIEWS, onlySource, phoneTitleFormat, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
+import { CALENDAR_VIEWS, onlySource, phoneTitleFormat, viewShortLabelKey, sourceBadge, toggleSource, toolbarLayout } from "./toolbar";
 
 const ZOOM_LEVELS = ["01:00:00", "00:30:00", "00:15:00"] as const;
 
@@ -244,7 +244,18 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     const shell = shellRef.current;
     if (!shell) return;
     const viewButton = shell.querySelector<HTMLElement>(".fc-viewMenu-button");
-    if (viewButton && !viewButton.querySelector("svg")) setIcon(viewButton, "calendar-days");
+    if (viewButton) {
+      // Show the active view like a select shows its value: "3 dni ▾".
+      const label = t(viewShortLabelKey(activeView));
+      if (viewButton.dataset.view !== activeView || !viewButton.querySelector(".bases-calendar-view-label")) {
+        viewButton.empty();
+        viewButton.createSpan({ cls: "bases-calendar-view-label", text: label });
+        const chevron = viewButton.createSpan({ cls: "bases-calendar-view-chevron" });
+        setIcon(chevron, "chevron-down");
+        viewButton.dataset.view = activeView;
+        viewButton.setAttribute("aria-label", `${t("viewMenu")}: ${label}`);
+      }
+    }
     const sourceButton = shell.querySelector<HTMLElement>(".fc-sourceMenu-button");
     if (sourceButton) {
       if (!sourceButton.querySelector("svg")) setIcon(sourceButton, "filter");

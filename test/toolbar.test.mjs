@@ -42,3 +42,12 @@ test("onlySource hides every role except the chosen one", async () => {
   assert.deepEqual(onlySource(["meeting", "event", "followup"], "event"), ["meeting", "followup"]);
   assert.deepEqual(onlySource(["meeting"], "meeting"), []);
 });
+
+test("phone view button label follows the active view", async () => {
+  const { viewShortLabelKey } = await import("../src/toolbar.ts");
+  assert.equal(viewShortLabelKey("dayGridMonth"), "shortMonth");
+  assert.equal(viewShortLabelKey("timeGridWeek"), "shortWeek");
+  assert.equal(viewShortLabelKey("workWeek"), "shortWorkWeek");
+  assert.equal(viewShortLabelKey("threeDay"), "threeDay");
+  assert.equal(viewShortLabelKey("timeGridDay"), "dayView");
+});

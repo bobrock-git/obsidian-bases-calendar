@@ -50,3 +50,14 @@ export function toggleSource(hidden: readonly string[], id: string): string[] {
 export function onlySource(allIds: readonly string[], id: string): string[] {
   return allIds.filter((item) => item !== id);
 }
+
+/** Translation key of the short label the phone view button shows ("3 dni ▾"). */
+export function viewShortLabelKey(view: string): "shortMonth" | "shortWeek" | "shortWorkWeek" | "threeDay" | "dayView" {
+  switch (view) {
+    case "dayGridMonth": return "shortMonth";
+    case "timeGridWeek": return "shortWeek";
+    case "workWeek": return "shortWorkWeek";
+    case "threeDay": return "threeDay";
+    default: return "dayView";
+  }
+}
