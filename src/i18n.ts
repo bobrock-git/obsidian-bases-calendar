@@ -4,7 +4,7 @@ const translations = {
   en: {
     calendar: "Calendar", empty: "Configure a start date property to display entries",
     zoomIn: "Zoom in", zoomOut: "Zoom out", workWeek: "Work week", threeDay: "3 day", dayView: "Day", today: "Today",
-    move: "Move events", stopMove: "Stop moving",
+    move: "Move events", stopMove: "Stop moving", filters: "Filters",
     reschedule: "Reschedule", openNote: "Open note", openTab: "Open in new tab", deleteFile: "Delete file",
     dateProperties: "Date properties", startDate: "Start date", endDate: "End date (optional)",
     dateSources: "Multiple date sources", dateSourcesHint: "Advanced: roles from one note (JSON or YAML list)",
@@ -25,7 +25,7 @@ const translations = {
   pl: {
     calendar: "Kalendarz", empty: "Skonfiguruj właściwość daty początkowej, aby wyświetlić wpisy",
     zoomIn: "Powiększ", zoomOut: "Pomniejsz", workWeek: "Tydzień roboczy", threeDay: "3 dni", dayView: "Dzień", today: "Dziś",
-    move: "Przesuń terminy", stopMove: "Zakończ przesuwanie",
+    move: "Przesuń terminy", stopMove: "Zakończ przesuwanie", filters: "Filtry",
     reschedule: "Zmień termin", openNote: "Otwórz notatkę", openTab: "Otwórz w nowej karcie", deleteFile: "Usuń plik",
     dateProperties: "Właściwości daty", startDate: "Data początkowa", endDate: "Data końcowa (opcjonalnie)",
     dateSources: "Wiele źródeł daty", dateSourcesHint: "Zaawansowane: role z jednej notatki (lista JSON lub YAML)",

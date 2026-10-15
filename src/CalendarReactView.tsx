@@ -162,6 +162,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   );
 
   const shellRef = useRef<HTMLDivElement>(null);
+  const sourceControlsRef = useRef<HTMLDivElement>(null);
   const sourceLabelsRef = useRef<[string, string][]>([]);
   const sourceIconsRef = useRef<Map<string, string>>(new Map());
   const hiddenSourcesRef = useRef<string[]>([]);
@@ -185,15 +186,21 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
       popoverRef.current.close();
       return;
     }
-    const pop = document.body.createDiv({ cls: "bases-calendar-source-popover" });
-    pop.setAttribute("role", "group");
+    const doc = anchor.ownerDocument;
+    const win = doc.defaultView!;
+    const pop = doc.body.createDiv({ cls: "bases-calendar-source-popover" });
+    pop.setAttribute("role", "dialog");
     pop.setAttribute("aria-label", t("filterEvents"));
+    pop.tabIndex = -1;
 
     const render = () => {
+      const focused = pop.contains(doc.activeElement) ? (doc.activeElement as HTMLElement).dataset.filterFocus : undefined;
+      const scrollTop = pop.scrollTop;
       pop.empty();
       const hidden = hiddenSourcesRef.current;
       const ids = sourceLabelsRef.current.map(([id]) => id);
       const showAll = pop.createEl("button", { cls: "bases-calendar-source-popover-all", text: t("showAll") });
+      showAll.dataset.filterFocus = "all";
       showAll.disabled = hidden.length === 0;
       showAll.onclick = () => apply([]);
       for (const [id, label] of sourceLabelsRef.current) {
@@ -201,6 +208,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         // Native label + checkbox: the browser tells a tap from a scroll.
         const lab = row.createEl("label");
         const box = lab.createEl("input", { type: "checkbox" });
+        box.dataset.filterFocus = `role:${id}`;
         box.checked = !hidden.includes(id);
         box.onchange = () => apply(toggleSource(hiddenSourcesRef.current, id));
         const iconName = sourceIconsRef.current.get(id);
@@ -210,8 +218,15 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
         }
         lab.createSpan({ text: label });
         const only = row.createEl("button", { cls: "clickable-icon", text: t("onlyThis") });
+        only.dataset.filterFocus = `only:${id}`;
+        only.setAttribute("aria-label", `${t("onlyThis")}: ${label}`);
         only.onclick = () => apply(soloSource(ids, hiddenSourcesRef.current, id));
       }
+      if (focused) {
+        const next = Array.from(pop.querySelectorAll<HTMLElement>("[data-filter-focus]")).find(el => el.dataset.filterFocus === focused && !el.matches(":disabled"));
+        (next ?? pop.querySelector<HTMLElement>("input") ?? pop).focus({ preventScroll: true });
+      }
+      pop.scrollTop = scrollTop;
     };
     const apply = (next: string[]) => {
       hiddenSourcesRef.current = next;
@@ -220,31 +235,65 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
     };
 
     const place = () => {
+      if (!anchor.isConnected || anchor.getClientRects().length === 0) {
+        close();
+        return;
+      }
       const rect = anchor.getBoundingClientRect();
-      pop.style.top = `${rect.bottom + 4}px`;
-      pop.style.right = `${Math.max(8, window.innerWidth - rect.right)}px`;
+      pop.style.maxHeight = `${Math.max(0, win.innerHeight - 16)}px`;
+      const bounds = pop.getBoundingClientRect();
+      pop.style.left = `${Math.max(8, Math.min(rect.left, win.innerWidth - bounds.width - 8))}px`;
+      pop.style.top = `${Math.max(8, Math.min(rect.bottom + 4, win.innerHeight - bounds.height - 8))}px`;
     };
     const onOutside = (evt: PointerEvent) => {
       const target = evt.target as Node;
       if (!pop.contains(target) && !anchor.contains(target)) close();
     };
-    const onKey = (evt: KeyboardEvent) => { if (evt.key === "Escape") close(); };
+    const onKey = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        evt.stopPropagation();
+        close();
+        anchor.focus();
+      }
+    };
+    const onFocus = (evt: FocusEvent) => {
+      const target = evt.target as Node;
+      if (!pop.contains(target) && !anchor.contains(target)) close();
+    };
+    const observer = new ResizeObserver(place);
+    let closed = false;
     const close = () => {
-      document.removeEventListener("pointerdown", onOutside, true);
-      document.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("resize", place);
+      if (closed) return;
+      closed = true;
+      const hadFocus = pop.contains(doc.activeElement);
+      doc.removeEventListener("pointerdown", onOutside, true);
+      doc.removeEventListener("keydown", onKey, true);
+      doc.removeEventListener("focusin", onFocus);
+      win.removeEventListener("resize", place);
+      doc.removeEventListener("scroll", place, true);
+      observer.disconnect();
       pop.remove();
       anchor.setAttribute("aria-expanded", "false");
       popoverRef.current = null;
+      if (hadFocus) {
+        const target = anchor.getClientRects().length ? anchor : shellRef.current?.querySelector<HTMLElement>(".bases-calendar-source-filter");
+        target?.focus({ preventScroll: true });
+      }
     };
 
     render();
     place();
-    document.addEventListener("pointerdown", onOutside, true);
-    document.addEventListener("keydown", onKey, true);
-    window.addEventListener("resize", place);
+    doc.addEventListener("pointerdown", onOutside, true);
+    doc.addEventListener("keydown", onKey, true);
+    doc.addEventListener("focusin", onFocus);
+    doc.addEventListener("scroll", place, true);
+    win.addEventListener("resize", place);
+    if (shellRef.current) observer.observe(shellRef.current);
+    observer.observe(anchor);
     anchor.setAttribute("aria-expanded", "true");
     popoverRef.current = { el: pop, close };
+    (pop.querySelector<HTMLElement>("input") ?? pop).focus({ preventScroll: true });
   };
 
   useEffect(() => closeSourcePopover, [closeSourcePopover]);
@@ -339,6 +388,20 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   const toolbar = toolbarLayout();
 
   const phone = isPhoneLayout();
+
+  // Wrapping changes the space left for the time grid without a window resize.
+  useEffect(() => {
+    const controls = sourceControlsRef.current;
+    const win = controls?.ownerDocument.defaultView;
+    if (!controls || !win) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      win.cancelAnimationFrame(frame);
+      frame = win.requestAnimationFrame(() => calendarRef.current?.getApi().updateSize());
+    });
+    observer.observe(controls);
+    return () => { observer.disconnect(); win.cancelAnimationFrame(frame); };
+  }, [phone, sourceLabels.length > 1]);
 
   const badge = sourceBadge(sourceLabels.length, hiddenSources.length);
   const api = () => calendarRef.current?.getApi();
@@ -762,6 +825,14 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
   return (
     <div ref={shellRef} className={`bases-calendar-react-shell${isPhoneLayout() && activeView === "threeDay" ? " bases-calendar-three-day" : ""}${isPhoneLayout() && moveMode ? " is-moving" : ""}`}>
       {!isPhoneLayout() && sourceLabels.length > 1 && (
+        <div ref={sourceControlsRef} className="bases-calendar-source-controls">
+        <button type="button" className="bases-calendar-source-menu"
+          aria-haspopup="dialog" aria-expanded="false" aria-label={`${t("filterEvents")}${badge ? ` (${badge})` : ""}`}
+          onClick={(evt) => toggleSourcePopover(evt.currentTarget)}>
+          <LucideIcon name="filter" />
+          <span>{t("filters")}{badge ? ` · ${badge}` : ""}</span>
+          <LucideIcon name="chevron-down" />
+        </button>
         <div className="bases-calendar-source-filters" role="group" aria-label={t("filterEvents")}>
           {sourceLabels.map(([id, label]) => (
             <button key={id} type="button" aria-pressed={!hiddenSources.includes(id)}
@@ -794,6 +865,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
             </button>
           )}
         </div>
+        </div>
       )}
       {phone && (
         // Phone toolbar is plain React, not FullCalendar custom buttons:
@@ -824,7 +896,7 @@ export const CalendarReactView: React.FC<CalendarReactViewProps> = ({
             )}
             {sourceLabels.length > 1 && (
               <button type="button" className={`clickable-icon bases-calendar-filter-button${badge ? " is-filtered" : ""}`}
-                aria-haspopup="dialog" aria-label={t("filterEvents")}
+                aria-haspopup="dialog" aria-expanded="false" aria-label={t("filterEvents")}
                 onClick={(evt) => toggleSourcePopover(evt.currentTarget)}>
                 <LucideIcon name="filter" />
                 {badge && <span className="bases-calendar-source-badge">{badge}</span>}

@@ -26,6 +26,8 @@ body {
 .bases-calendar-react-shell {
   display: flex;
   flex-direction: column;
+  container: calendar-shell / inline-size;
+  min-width: 0;
   height: 100%;
   min-height: 0;
 }
@@ -540,15 +542,38 @@ body.is-phone .bases-calendar-reschedule-modal .bases-calendar-reschedule-action
 	--bases-view-padding: 0;
 }
 
-/* Desktop: role filters are one scrollable row of toggles. Off is shown by
+/* Desktop: wrap whole filters; a narrow calendar pane gets the shared picker.
+   Use the pane width, not the window width (split panes and pop-out windows).
+   Off is shown by
    shape (dashed outline, strike-through), not by colour alone. */
+.bases-calendar-source-controls {
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
 .bases-calendar-source-filters {
 	display: flex;
-	flex-wrap: nowrap;
-	overflow-x: auto;
+	flex-wrap: wrap;
 	gap: var(--size-4-1);
 	padding: var(--size-4-1) var(--size-4-2);
-	scrollbar-width: none;
+}
+
+.bases-calendar-source-menu {
+	display: none;
+	align-items: center;
+	gap: var(--size-4-1);
+	max-width: calc(100% - var(--size-4-2) * 2);
+	margin: var(--size-4-1) var(--size-4-2);
+}
+
+@container calendar-shell (width < 480px) {
+	.bases-calendar-source-filters {
+		display: none;
+	}
+
+	.bases-calendar-source-menu {
+		display: inline-flex;
+	}
 }
 
 .bases-calendar-source-filter {
@@ -658,15 +683,16 @@ body.is-phone .bases-calendar-container {
 	}
 }
 
-/* Phone filter popover: stays open while roles are toggled; closes on a tap
+/* Shared filter picker: stays open while roles are toggled; closes on a tap
    outside, Escape or a second tap on the filter icon. */
 .bases-calendar-source-popover {
 	position: fixed;
 	z-index: var(--layer-menu);
 	display: flex;
 	flex-direction: column;
-	min-width: 14rem;
-	max-width: 96vw;
+	box-sizing: border-box;
+	min-width: min(14rem, calc(100vw - 16px));
+	max-width: calc(100vw - 16px);
 	max-height: 70vh;
 	overflow-y: auto;
 	padding: var(--size-2-3);
@@ -691,10 +717,15 @@ body.is-phone .bases-calendar-container {
 .bases-calendar-source-popover-row label {
 	display: flex;
 	flex: 1 1 auto;
+	min-width: 0;
 	align-items: center;
 	gap: var(--size-4-2);
 	min-height: 44px;
 	touch-action: manipulation;
+}
+
+.bases-calendar-source-popover-row label span:last-child {
+	overflow-wrap: anywhere;
 }
 
 .bases-calendar-source-popover-row .clickable-icon {
